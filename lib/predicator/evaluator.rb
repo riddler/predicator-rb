@@ -63,6 +63,8 @@ module Predicator
 
     def to_date val
       val.nil? ? nil : Date.parse(val)
+    rescue ArgumentError
+      nil
     end
 
     def date_ago seconds
