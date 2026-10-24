@@ -113,9 +113,11 @@ class EvaluatorLibraryTest < Minitest::Test
   end
 
   # sabotage: drop the Integer branch in MathFunctions#math_sqrt (`if
-  # false`); 2**80 answers a Float and the first assert_same fails.
+  # false`); 2**80 answers a Float and the assert_kind_of fails.
   def test_sqrt_is_exact_for_an_integer_square
-    assert_same 2**40, value("Math.sqrt", 2**80)
+    root = value("Math.sqrt", 2**80)
+    assert_kind_of Integer, root
+    assert_equal 2**40, root
     assert_same 1.5, value("Math.sqrt", 2.25)
     assert_equal "Math.sqrt expects a numeric argument", refused("Math.sqrt", "4")
   end

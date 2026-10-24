@@ -52,7 +52,7 @@ class EvaluatorJsonTest < Minitest::Test
   # answering the inspect; the call is refused and written's
   # assert_predicate fails.
   def test_stringify_writes_a_value_with_no_json_form_as_its_inspect
-    assert_equal '{1 => "x"}', written({ 1 => "x" })
+    assert_equal({ 1 => "x" }.inspect, written({ 1 => "x" }))
     invalid = "a\xFF".dup.force_encoding(Encoding::UTF_8)
     assert_equal [invalid].inspect, written([invalid])
     assert_equal "[:x]", written([:x])
