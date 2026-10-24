@@ -82,7 +82,7 @@ class TaggedJsonTest < Minitest::Test
   # exactly to the limit is refused and the assert_equal on [true, true]
   # fails.
   def test_decode_reads_a_text_nested_to_the_depth_limit
-    limit = Tagged::DEPTH_LIMIT
+    limit = DEPTH_LIMIT
 
     assert_equal([true, true], [nested(limit), nested_maps(limit)].map { |text| Tagged.decode(text).ok? })
   end
@@ -90,7 +90,7 @@ class TaggedJsonTest < Minitest::Test
   # sabotage: compare depth <= DEPTH_LIMIT + 1 in Reader.deep; the texts one
   # level past the limit decode and the assert_equal on the refusals fails.
   def test_decode_refuses_a_text_nested_past_the_depth_limit
-    limit = Tagged::DEPTH_LIMIT
+    limit = DEPTH_LIMIT
     too_deep = [nested(limit + 1), nested_maps(limit + 1), nested(1000),
                 nested(limit - 1, %({"$type":"duration","value":#{THREE_DAYS}}))]
 
@@ -100,11 +100,12 @@ class TaggedJsonTest < Minitest::Test
   # sabotage: drop the deep call from Writer.container; the value nested
   # past the limit is written and the assert_equal on its refusal fails.
   def test_encode_holds_to_the_same_depth_limit
-    at_limit = decoded(nested(Tagged::DEPTH_LIMIT))
+    at_limit = decoded(nested(DEPTH_LIMIT))
 
     assert_predicate Tagged.encode(at_limit), :ok?
+    assert_raises(NameError) { Predicator::Tagged::DEPTH_LIMIT }
     assert_equal(%w[depth_limit_exceeded] * 2,
-                 [[at_limit], wrapped(Tagged::DEPTH_LIMIT - 1, Predicator::Duration.new)]
+                 [[at_limit], wrapped(DEPTH_LIMIT - 1, Predicator::Duration.new)]
                    .map { |value| refusal(Tagged.encode(value)) })
   end
 

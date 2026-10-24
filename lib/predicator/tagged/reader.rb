@@ -10,7 +10,7 @@ module Predicator
     module Reader
       DURATION_UNITS = %w[years months weeks days hours minutes seconds].freeze
       DATE_TEXT = /\A(\d{4})-(\d{2})-(\d{2})\z/
-      DATETIME_TEXT = /\A(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:\.(\d+))?(Z|[+-]\d{2}(?::?\d{2})?)\z/
+      DATETIME_TEXT = /\A(\d{4})-(\d{2})-(\d{2})[T ](\d{2}):(\d{2}):(\d{2})(?:[.,](\d+))?(Z|[+-]\d{2}(?::?\d{2})?)\z/
       OFFSET_TEXT = /\A([+-])(\d{2}):?(\d{2})?\z/
       READERS = { "date" => :read_date, "datetime" => :read_datetime, "duration" => :read_duration }.freeze
 
@@ -84,9 +84,11 @@ module Predicator
       end
 
       # Read as the reference's ISO parser reads one: a T or a space between
-      # the date and the time, any count of fraction digits (to
-      # microseconds; the encoder writes none or six), and an offset other
-      # than Z read as the instant it names, with "-00:00" refused. An offset
+      # the date and the time; a fraction after a full stop or a comma, of
+      # any count of digits (read to microseconds; the encoder writes none or
+      # six); and an offset of Z, +HH:MM, +HHMM or +HH (either sign) read as
+      # the instant it names. The one offset refused is the literal "-00:00";
+      # "-0000" and "-00" read as UTC, as the reference reads them. An offset
       # that moves the instant outside the years 0 to 9999 is refused, since
       # the encoder could not write it back.
       def read_datetime(text)
@@ -112,12 +114,13 @@ module Predicator
 
       def read_offset(zone)
         return 0 if zone == "Z"
+        return if zone == "-00:00"
 
         sign, hours, minutes = OFFSET_TEXT.match(zone).captures
         hours = hours.to_i # two digits, by OFFSET_TEXT
         minutes = minutes.to_i # two digits, or absent and zero
         seconds = (hours * 3600) + (minutes * 60)
-        return if hours > 23 || minutes > 59 || (sign == "-" && seconds.zero?)
+        return if hours > 23 || minutes > 59
 
         sign == "-" ? -seconds : seconds
       end

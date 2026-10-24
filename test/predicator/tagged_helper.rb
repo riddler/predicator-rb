@@ -7,6 +7,9 @@ require "predicator/tagged"
 module TaggedHelper
   Tagged = Predicator::Tagged
   DATE = Predicator::Date.new(2026, 8, 6)
+  # The codec's nesting limit, a private constant read here so the tests
+  # follow it.
+  DEPTH_LIMIT = Tagged.const_get(:DEPTH_LIMIT)
   THREE_DAYS = '{"years":0,"months":0,"weeks":0,"days":3,"hours":0,"minutes":0,"seconds":0}'
 
   def decoded(text) = Tagged.decode!(text)
