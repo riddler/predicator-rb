@@ -51,9 +51,11 @@ class EvaluatorTest < Minitest::Test
     assert_fails "EvaluationError", "unknown_instruction", [[]]
   end
 
-  # sabotage: answer unknown(at) for a retired row in Machine#step; the
-  # assert_fails's assert_equal on the reason fails.
+  # sabotage: check the shape before retirement in Machine#step (drop the
+  # by-name refusal, so row_for's arity check answers first); ["and", 1]
+  # fails unknown and the first assert_fails's assert_equal fails.
   def test_a_retired_opcode_is_refused_as_retired
+    assert_fails "EvaluationError", "retired_opcode", [["lit", true], ["and", 1]]
     assert_fails "EvaluationError", "retired_opcode", [["lit", true], ["lit", true], ["and"]]
     assert_fails "EvaluationError", "retired_opcode", [["lit", true], ["lit", true], ["or"]]
   end

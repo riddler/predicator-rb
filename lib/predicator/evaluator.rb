@@ -118,12 +118,15 @@ module Predicator
         Result.ok(@stack.last)
       end
 
-      # The instruction's shape is checked first, then whether it is
-      # retired, and only then does it run.
+      # A retired opcode is refused by its name whatever its operands, as the
+      # reference refuses it; any other instruction's shape is checked, and
+      # only then does it run.
       def step(instruction, at)
+        named = INSTRUCTIONS[instruction.first] if instruction.is_a?(Array)
+        return retired(instruction.first, named.removed_in) if named && retired?(named)
+
         row = row_for(instruction)
         return unknown(at) unless row
-        return retired(instruction.first, row.removed_in) if retired?(row)
 
         send(row.handler, at, *instruction.drop(1))
       end

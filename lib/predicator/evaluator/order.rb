@@ -12,6 +12,15 @@ module Predicator
       # the order, so the walk steps to the next position.
       LEVEL = :level
 
+      # Where each kind of member sits in the reference's term order, for a
+      # member pair of two different kinds: a number, then false, null, true
+      # and undefined, then the map-like values (a map, a duration, a date, a
+      # datetime), then a list, then a string.
+      MEMBER_RANKS = { number: 0, map: 5, duration: 5, chronological: 5, list: 6, string: 7 }.freeze
+
+      # The rank of each member that is one value of its own kind.
+      SINGLE_RANKS = { false => 1, nil => 2, true => 3 }.freeze
+
       module_function
 
       # The order of a type-matched pair (-1, 0 or 1), or nil when the pair
@@ -40,19 +49,22 @@ module Predicator
       end
 
       # One member pair of a list walk: LEVEL when it does not decide, else
-      # the order it decides, or nil when it has none. A null member and a
-      # date member against a datetime member are placed as the reference's
-      # term order places them.
+      # the order it decides, or nil when it has none. Two members of
+      # different kinds are placed by the reference's term order (rank); two
+      # nulls, two undefineds, two falses or two trues are level; a date
+      # member orders before a datetime member, as term order places them.
       def member_order(left, right)
-        return null_order(left, right) if left.nil? || right.nil?
+        ranks = [rank(left), rank(right)]
+        return ranks.first <=> ranks.last unless ranks.first == ranks.last
+        return LEVEL if (1..4).cover?(ranks.first)
         return left.is_a?(Predicator::Date) ? -1 : 1 if Compare.date_against_datetime?(left, right)
         return LEVEL if Compare.loose_equal?(left, right, by_instant: left.is_a?(Hash) && right.is_a?(Hash))
 
         differing_order(left, right)
       end
 
-      # A member pair that is not equal: its order, LEVEL when it orders
-      # level and is equal by instant, or nil.
+      # A member pair of one kind that is not equal: its order, LEVEL when it
+      # orders level and is equal by instant, or nil.
       def differing_order(left, right)
         order = order(left, right)
         return order unless order&.zero?
@@ -60,15 +72,13 @@ module Predicator
         Compare.loose_equal?(left, right, by_instant: true) ? LEVEL : nil
       end
 
-      # A null member orders after a number and after false, and before
-      # every other member.
-      def null_order(left, right)
-        return LEVEL if left.nil? && right.nil?
+      # A member's rank in term order (MEMBER_RANKS, SINGLE_RANKS); undefined
+      # ranks 4. A value outside the domain has no rank.
+      def rank(member)
+        return 4 if Compare.undefined?(member)
 
-        left.nil? ? null_against(right) : -null_against(left)
+        SINGLE_RANKS.fetch(member) { MEMBER_RANKS[Compare.kind(member)] }
       end
-
-      def null_against(other) = Compare.kind(other) == :number || false.equal?(other) ? 1 : -1
     end
     private_constant :Order
   end
