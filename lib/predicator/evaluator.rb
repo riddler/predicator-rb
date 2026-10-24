@@ -157,7 +157,9 @@ module Predicator
     # @option options [#call, nil] :clock the clock: called with no argument,
     #   it answers the current time as a {Predicator::DateTime}. It is called
     #   at most once, and only when an instruction reads the time. nil, the
-    #   default, means {SYSTEM_CLOCK}.
+    #   default, means {SYSTEM_CLOCK}. A clock that answers anything else, or
+    #   raises a StandardError, stops the run with an EvaluationError whose
+    #   reason is clock_failed, whichever instruction read it.
     # @option options [Hash{String => #call}] :functions the host's functions
     #   for this evaluation, by the name a `call` instruction names. Each is
     #   called with the call's arguments, first argument first, and answers
@@ -171,9 +173,8 @@ module Predicator
     #   loop_budget_exceeded.
     # @return [Result] the top of the stack at halt, or the error that
     #   stopped the run
-    # @raise [ArgumentError] when an argument is not of its kind, an option
-    #   is unknown, or the clock answers something other than a
-    #   {Predicator::DateTime} (a caller's bug, not an outcome of the
+    # @raise [ArgumentError] when an argument is not of its kind, or an
+    #   option is unknown or malformed (a caller's bug, not an outcome of the
     #   program)
     def self.evaluate(instructions, context = {}, **options) = machine(instructions, context, options).run
 
@@ -287,9 +288,7 @@ module Predicator
       # Runs in statement mode: the answer is the context at halt. Neither
       # halt rule of expression mode applies, as there is no stack value to
       # answer.
-      def run_statements
-        StatementResult.new(error: drive, context: @context, value: @last_value)
-      end
+      def run_statements = StatementResult.new(error: drive, context: @context, value: @last_value)
 
       private
 
@@ -304,6 +303,8 @@ module Predicator
           at = step
         end
         nil
+      rescue ClockFault => e
+        e.error
       end
 
       # The answer at halt. An empty stack is an error; undefined on top is

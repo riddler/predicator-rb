@@ -20,12 +20,13 @@ require_relative "predicator/emitter"
 # membership walk nested lists and maps without recursing, so a value a
 # program nests to any depth is compared, never overflowing the stack.
 #
-# Two things still raise. A caller's own bug (an argument of the wrong kind,
-# an unknown or malformed option, a clock that answers something other than
-# a {Predicator::DateTime}) raises ArgumentError. And an exception that is
-# not a StandardError (an Interrupt, a SystemExit, a NoMemoryError), raised
-# by host code a run calls (a host function or the clock), propagates
-# unchanged: it is the host failing, not an outcome of the program.
+# Two things still raise. A caller's own bug in the call itself (an argument
+# of the wrong kind, an unknown or malformed option, a clock that does not
+# respond to `call`) raises ArgumentError at the entry point. And an
+# exception that is not a StandardError (an Interrupt, a SystemExit, a
+# NoMemoryError), raised by host code a run calls (a host function or the
+# clock), propagates unchanged: it is the host failing, not an outcome of
+# the program.
 #
 # The value domain is Ruby's own values where they fit - nil (null), true and
 # false, Integer and Float (kept apart), String, Array (a list) and Hash (a
@@ -52,8 +53,10 @@ require_relative "predicator/emitter"
 #   library function of the same name, for this run only. `{}` by default.
 # - `clock:` a callable answering the current time as a
 #   {Predicator::DateTime}, read at most once per run and only when the
-#   program reads the time; the system's real-time clock by default. One
-#   that answers anything else raises ArgumentError.
+#   program reads the time; the system's real-time clock by default. A
+#   clock that answers anything else, or raises a StandardError, fails the
+#   run with an EvaluationError whose reason is `clock_failed`, whether a
+#   relative date or `Date.now()` read it.
 # - `on_unbound:` what a load of a variable the context does not bind does:
 #   `:undefined` (the default) pushes {Predicator::UNDEFINED}, and the run
 #   fails with an UndefinedVariableError only if undefined is its answer;
@@ -161,8 +164,8 @@ module Predicator
   #   `loop_budget:`, as {Predicator} describes them
   # @return [Result] the value, or the error value
   # @raise [ArgumentError] when the program or the context is not of its
-  #   kind, an option is unknown or malformed, or the clock answers something
-  #   other than a {Predicator::DateTime}
+  #   kind, or an option is unknown or malformed (a clock that does not
+  #   respond to `call` among them)
   def self.evaluate(program, context = {}, **)
     instructions = instructions_of(program) { |source| compile(source) }
     return instructions if instructions.is_a?(Result)

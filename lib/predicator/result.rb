@@ -25,7 +25,8 @@ module Predicator
   end
 
   # The two ways the package builds a {Result}. Private to the package: a
-  # host reads results, it does not make them.
+  # host reads results and does not need to make them (Result.new and
+  # Result[] stay public, as Data defines them).
   module Results
     module_function
 

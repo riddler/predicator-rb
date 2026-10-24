@@ -2,6 +2,21 @@
 
 module Predicator
   module Evaluator
+    # A clock that failed: it answered something other than a
+    # {Predicator::DateTime}, or raised a StandardError. Raised by the read of
+    # the clock wherever an instruction reads the time, and rescued by the
+    # run's loop ({Machine}), which stops the run with the EvaluationError it
+    # carries (reason clock_failed). It never leaves an evaluation.
+    class ClockFault < StandardError
+      attr_reader :error
+
+      def initialize(message)
+        @error = EvaluationError.new(reason: "clock_failed", message:)
+        super
+      end
+    end
+    private_constant :ClockFault
+
     # The rich-type opcodes, as the reference's ISA (docs/isa.md, section 5)
     # states them: the handlers {Machine} runs for `duration`,
     # `relative_date`, `object_new` and `object_set`.
@@ -75,16 +90,22 @@ module Predicator
       end
 
       # The current time of this evaluation: the clock's answer the first
-      # time it is asked for, and the same instant every time after.
-      def now
-        return @now if @now
+      # time it is asked for, and the same instant every time after. A clock
+      # that answers anything but a {Predicator::DateTime}, or raises a
+      # StandardError, raises ClockFault, which stops the run with a failed
+      # result whichever instruction read it; an exception that is not a
+      # StandardError propagates.
+      def now = @now ||= read_clock
 
+      def read_clock
         instant = @clock.call
-        unless instant.is_a?(Predicator::DateTime)
-          raise ArgumentError, "the clock answered #{instant.inspect}, not a Predicator::DateTime"
-        end
+        return instant if instant.is_a?(Predicator::DateTime)
 
-        @now = instant
+        raise ClockFault, "the clock answered #{instant.inspect}, not a Predicator::DateTime"
+      rescue ClockFault
+        raise
+      rescue StandardError => e
+        raise ClockFault, "the clock raised: #{e.inspect}"
       end
 
       # A duration as it is, a plain map as the duration its unit names make
