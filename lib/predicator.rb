@@ -4,6 +4,7 @@ require_relative "predicator/version"
 require_relative "predicator/values"
 require_relative "predicator/errors"
 require_relative "predicator/result"
+require_relative "predicator/evaluator"
 
 # A safe, non-evaluating condition language for end users.
 #
