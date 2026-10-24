@@ -5,13 +5,17 @@ require "test_helper"
 # The value classes the domain adds to Ruby's own values: the one undefined,
 # civil dates, instants and durations.
 class ValuesTest < Minitest::Test
+  # The day-count conversions are private to the package, so the tests
+  # reach them by name.
+  CIVIL = Predicator.const_get(:Civil)
+
   # sabotage: make Undefined#dup answer super; the assert_same on the dup
   # fails.
   def test_undefined_is_one_value_distinct_from_nil
     assert_same Predicator::UNDEFINED, Predicator::UNDEFINED.dup
     assert_same Predicator::UNDEFINED, Predicator::UNDEFINED.clone
     refute_nil Predicator::UNDEFINED
-    assert_raises(NoMethodError) { Predicator::Undefined.new }
+    assert_raises(NoMethodError) { Predicator::UNDEFINED.class.new }
     assert_equal "Predicator::UNDEFINED", Predicator::UNDEFINED.inspect
     assert_predicate Predicator::UNDEFINED, :frozen?
   end
@@ -19,10 +23,10 @@ class ValuesTest < Minitest::Test
   # sabotage: drop the `- 719_468` from Civil.days_from_civil; the
   # assert_equal on the epoch's day count fails.
   def test_a_date_converts_to_and_from_its_day_count
-    assert_equal 0, Predicator::Date.new(1970, 1, 1).to_days
-    assert_equal 20_671, Predicator::Date.new(2026, 8, 6).to_days
-    assert_equal(-1, Predicator::Date.new(1969, 12, 31).to_days)
-    assert_equal Predicator::Date.new(2000, 2, 29), Predicator::Date.from_days(11_016)
+    assert_equal 0, CIVIL.days_of(Predicator::Date.new(1970, 1, 1))
+    assert_equal 20_671, CIVIL.days_of(Predicator::Date.new(2026, 8, 6))
+    assert_equal(-1, CIVIL.days_of(Predicator::Date.new(1969, 12, 31)))
+    assert_equal Predicator::Date.new(2000, 2, 29), CIVIL.date_of_days(11_016)
   end
 
   # sabotage: replace shifted.div(400) with (shifted / 400.0).to_i in
@@ -32,7 +36,7 @@ class ValuesTest < Minitest::Test
     [[-1, 3, 1], [0, 2, 29], [1, 1, 1], [1600, 2, 29], [1900, 3, 1], [9999, 12, 31], [12_345, 6, 7]].each do |parts|
       date = Predicator::Date.new(*parts)
 
-      assert_equal date, Predicator::Date.from_days(date.to_days)
+      assert_equal date, CIVIL.date_of_days(CIVIL.days_of(date))
     end
   end
 
@@ -43,7 +47,6 @@ class ValuesTest < Minitest::Test
      [2026, "1", 1]].each do |parts|
       assert_raises(ArgumentError, parts.inspect) { Predicator::Date.new(*parts) }
     end
-    assert_raises(ArgumentError) { Predicator::Date.from_days(1.5) }
     assert_equal [29, 29], [Predicator::Date.new(2000, 2, 29).day, Predicator::Date.new(2024, 2, 29).day]
   end
 

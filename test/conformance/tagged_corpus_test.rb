@@ -49,7 +49,7 @@ class TaggedCorpusTest < Minitest::Test
   def test_the_runner_reads_every_case_through_the_codec
     seen = CORPUS.cases.flat_map { |item| classes_of(item) }.uniq
 
-    [Predicator::Date, Predicator::DateTime, Predicator::Duration, Predicator::Undefined, Float, Integer,
+    [Predicator::Date, Predicator::DateTime, Predicator::Duration, Predicator::UNDEFINED.class, Float, Integer,
      NilClass].each { |kind| assert_includes seen, kind }
     date_case = CORPUS.cases.find { |item| item["id"] == "arithmetic/date-plus-duration" }
 

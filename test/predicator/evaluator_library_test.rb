@@ -105,7 +105,7 @@ class EvaluatorLibraryTest < Minitest::Test
       asked += 1
       instant
     }
-    both = run_list([["call", "Date.now", 0], ["call", "Date.now", 0], ["make_list", 2]], now: clock)
+    both = run_list([["call", "Date.now", 0], ["call", "Date.now", 0], ["make_list", 2]], clock:)
     assert_equal [instant, instant], both.value
     assert_equal 1, asked
   end

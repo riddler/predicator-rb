@@ -6,6 +6,7 @@ require_relative "result"
 require_relative "float_text"
 require_relative "duration_text"
 require_relative "iso_text"
+require_relative "boundary"
 require_relative "evaluator/chronology"
 require_relative "evaluator/arithmetic"
 require_relative "evaluator/access"
@@ -20,8 +21,10 @@ module Predicator
   # runs in one of two modes, carried by the entry point and not by the
   # list: in expression mode ({evaluate}) the answer is the top of the stack
   # at halt; in statement mode ({execute}) it is the context at halt. The
-  # instructions mean the same in both. It is private to the package until
-  # the public entry points call it.
+  # instructions mean the same in both. It is private to the package: the
+  # public entry points ({Predicator.evaluate}, {Predicator.execute} and
+  # {Predicator.execute_value}) check what they are handed against the
+  # value domain ({Boundary}) and then call it.
   #
   # A program is a flat list of instructions run in order from index 0; it
   # halts when the instruction pointer reaches or passes the end, so a jump
@@ -151,7 +154,7 @@ module Predicator
     # @param options [Hash] the evaluation's options, each optional:
     # @option options [Symbol] :on_unbound one of {UNBOUND_POLICIES};
     #   :undefined when not given
-    # @option options [#call, nil] :now the clock: called with no argument,
+    # @option options [#call, nil] :clock the clock: called with no argument,
     #   it answers the current time as a {Predicator::DateTime}. It is called
     #   at most once, and only when an instruction reads the time. nil, the
     #   default, means {SYSTEM_CLOCK}.
@@ -197,19 +200,22 @@ module Predicator
     end
     private_class_method :machine
 
-    def self.settings(on_unbound: :undefined, now: nil, functions: {}, loop_budget: DEFAULT_LOOP_BUDGET)
+    def self.settings(on_unbound: :undefined, clock: nil, functions: {}, loop_budget: DEFAULT_LOOP_BUDGET)
       unless UNBOUND_POLICIES.include?(on_unbound)
         raise ArgumentError, "on_unbound must be one of #{UNBOUND_POLICIES.inspect}, not #{on_unbound.inspect}"
       end
-      raise ArgumentError, "now must respond to call, not #{now.inspect}" unless now.nil? || now.respond_to?(:call)
+      raise ArgumentError, "clock must respond to call, not #{clock.inspect}" unless clock?(clock)
       unless loop_budget.is_a?(Integer) && !loop_budget.negative?
         raise ArgumentError, "loop_budget must be an Integer of at least 0, not #{loop_budget.inspect}"
       end
 
       check_functions(functions)
-      Settings.new(on_unbound:, clock: now || SYSTEM_CLOCK, functions:, loop_budget:)
+      Settings.new(on_unbound:, clock: clock || SYSTEM_CLOCK, functions:, loop_budget:)
     end
     private_class_method :settings
+
+    def self.clock?(clock) = clock.nil? || clock.respond_to?(:call)
+    private_class_method :clock?
 
     def self.check_functions(functions)
       raise ArgumentError, "functions must be a Hash, not #{functions.inspect}" unless functions.is_a?(Hash)

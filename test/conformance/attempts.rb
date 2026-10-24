@@ -18,28 +18,23 @@ module Conformance
   # predicator values, not the encoding's tags.
   #
   # The evaluator surface runs the case's instructions and context through
-  # the package's evaluator, under the default unbound policy (the corpus
-  # runs every case under the default option), and compares the answer with
-  # expected_result, or the error's type and reason with expected_error. The
-  # evaluator is private to the package until the public entry points call
-  # it, so the seam reaches it by name. The compiler surface compiles the
-  # case's source with Predicator.compile and compares the instruction list
-  # with the case's instructions, operand by operand as identical? judges
-  # them (an Integer is not a Float, a date is not a datetime). ISA_VERSION
-  # gives way to the package's own accessor when the public surface has
-  # one.
+  # Predicator.evaluate, under the default unbound policy (the corpus runs
+  # every case under the default option), and compares the answer with
+  # expected_result, or the error's type and reason with expected_error.
+  # The compiler surface compiles the case's source with Predicator.compile
+  # and compares the instruction list with the case's instructions, operand
+  # by operand as identical? judges them (an Integer is not a Float, a date
+  # is not a datetime).
   module Attempts
     # The instruction-set version this package claims, which scopes which
-    # cases a run attempts (Corpus#runnable). It is the package's version, not
-    # the vendored corpus's: the two are read separately even while they agree.
-    ISA_VERSION = 6
-
-    # The package's evaluator.
-    EVALUATOR = Predicator.const_get(:Evaluator)
+    # cases a run attempts (Corpus#runnable). It is the package's version, read
+    # from Predicator.isa_version, not the vendored corpus's: the two are read
+    # separately even while they agree.
+    ISA_VERSION = Predicator.isa_version
 
     # The evaluator surface's attempt of one case.
     def self.evaluate(item)
-      result = EVALUATOR.evaluate(item["instructions"], item["context"])
+      result = Predicator.evaluate(item["instructions"], item["context"])
       item.key?("expected_error") ? error_answer(result, item["expected_error"]) : value_answer(result, item)
     end
 

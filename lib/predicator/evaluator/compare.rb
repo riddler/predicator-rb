@@ -124,7 +124,7 @@ module Predicator
       def instant(value)
         return [value.epoch_seconds, value.microsecond] if value.is_a?(Predicator::DateTime)
 
-        [value.to_days * Civil::SECONDS_PER_DAY, 0]
+        [Civil.days_of(value) * Civil::SECONDS_PER_DAY, 0]
       end
     end
     private_constant :Compare
