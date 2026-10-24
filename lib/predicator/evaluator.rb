@@ -3,6 +3,10 @@
 require_relative "values"
 require_relative "errors"
 require_relative "result"
+require_relative "float_text"
+require_relative "evaluator/chronology"
+require_relative "evaluator/arithmetic"
+require_relative "evaluator/access"
 
 module Predicator
   # The stack machine that runs an instruction list against a context, in
@@ -42,7 +46,8 @@ module Predicator
       value: ->(_operand) { true },
       string: ->(operand) { operand.is_a?(String) },
       comparison_operator: ->(operand) { Compare::OPERATORS.include?(operand) },
-      positive_integer: ->(operand) { operand.is_a?(Integer) && operand.positive? }
+      positive_integer: ->(operand) { operand.is_a?(Integer) && operand.positive? },
+      count: ->(operand) { operand.is_a?(Integer) && !operand.negative? }
     }.freeze
 
     # The instructions this build knows, by opcode. `and` and `or` were
@@ -59,6 +64,16 @@ module Predicator
                                         handler: :jump_if_falsy_or_pop),
       "jump_if_true_or_pop" => Row.new(operands: [:positive_integer], removed_in: nil,
                                        handler: :jump_if_true_or_pop),
+      "add" => Row.new(operands: [], removed_in: nil, handler: :add),
+      "subtract" => Row.new(operands: [], removed_in: nil, handler: :subtract),
+      "multiply" => Row.new(operands: [], removed_in: nil, handler: :multiply),
+      "divide" => Row.new(operands: [], removed_in: nil, handler: :divide),
+      "modulo" => Row.new(operands: [], removed_in: nil, handler: :modulo),
+      "access" => Row.new(operands: [:string], removed_in: nil, handler: :access),
+      "bracket_access" => Row.new(operands: [], removed_in: nil, handler: :bracket_access),
+      "in" => Row.new(operands: [], removed_in: nil, handler: :membership_in),
+      "contains" => Row.new(operands: [], removed_in: nil, handler: :membership_contains),
+      "make_list" => Row.new(operands: [:count], removed_in: nil, handler: :make_list),
       "and" => Row.new(operands: [], removed_in: 3, handler: nil),
       "or" => Row.new(operands: [], removed_in: 3, handler: nil)
     }.freeze
@@ -84,8 +99,14 @@ module Predicator
 
     # One evaluation: the program, the context, the policy, the stack and the
     # first root a load did not find bound. Each handler answers the index
-    # of the next instruction, or the error value that stops the run.
+    # of the next instruction, or the error value that stops the run. The
+    # handlers of the arithmetic opcodes are in {Arithmetic}, and those of
+    # access, membership and list construction in {Access}; Machine includes
+    # both.
     class Machine
+      include Arithmetic
+      include Access
+
       def initialize(program, context, on_unbound)
         @program = program
         @context = context
@@ -175,7 +196,7 @@ module Predicator
         return insufficient(operation) if @stack.empty?
 
         operand = @stack.pop
-        return mismatch(operation, "boolean", operand) unless true.equal?(operand) || false.equal?(operand)
+        return mismatch(operation, "a boolean", operand) unless true.equal?(operand) || false.equal?(operand)
 
         push(at, !operand)
       end
@@ -184,7 +205,7 @@ module Predicator
         return insufficient("unary_minus") if @stack.empty?
 
         operand = @stack.pop
-        return mismatch("unary_minus", "number", operand) unless operand.is_a?(Integer) || operand.is_a?(Float)
+        return mismatch("unary_minus", "a number", operand) unless operand.is_a?(Integer) || operand.is_a?(Float)
 
         push(at, -operand)
       end
@@ -200,7 +221,7 @@ module Predicator
         return insufficient(opcode) if @stack.empty?
 
         truth = truth(@stack.last)
-        return mismatch(opcode, "boolean", @stack.last) if truth.nil?
+        return mismatch(opcode, "a boolean", @stack.last) if truth.nil?
         return at + offset if truth == jump_on
 
         @stack.pop
@@ -218,7 +239,7 @@ module Predicator
       def mismatch(operation, wanted, operand)
         return unbound(@unbound) if UNDEFINED.equal?(operand) && @unbound
 
-        TypeMismatchError.new(reason: operation, message: "#{operation} expects a #{wanted}")
+        TypeMismatchError.new(reason: operation, message: "#{operation} expects #{wanted}")
       end
 
       def unbound(name) = UndefinedVariableError.new(reason: "unbound_variable", message: "Undefined variable: #{name}")
