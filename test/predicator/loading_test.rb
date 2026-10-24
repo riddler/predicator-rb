@@ -26,7 +26,7 @@ class LoadingTest < Minitest::Test
                                   evaluator/calls evaluator/casts evaluator/chronology evaluator/compare
                                   evaluator/json_functions evaluator/json_scan evaluator/library
                                   evaluator/math_functions evaluator/order evaluator/rich_types evaluator/statements
-                                  float_text iso_text result values version]
+                                  float_text iso_text lexer lexer/literals lexer/numbers result values version]
            .map { |f| "predicator/#{f}.rb" }
 
     assert_equal %(["constant", "constant", #{codec.inspect}]\n), loaded_by("predicator/tagged")
