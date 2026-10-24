@@ -17,13 +17,16 @@ module Predicator
     # character that is not a unit: `5days` is 5, the unit `d`, and the
     # identifier `ays`.
     #
-    # After the units the reference's lexer goes on from a copy of the text
-    # that ends at the first line feed past the character just after them, so
-    # the rest of the source from that line feed on is not read; and it
-    # advances its column by the grapheme clusters the units and that
-    # dropped text spanned, not by their characters. Both are reproduced
-    # here, the corpus fixing neither: `5d x` on one line, then a line
-    # feed and `y`, scans as 5, `d` and `x` at column 6 and stops.
+    # After the FIRST unit the reference's lexer goes on from a copy of the
+    # text that starts just after that unit and ends at the first line feed
+    # past the copy's first character. Any further units are read inside
+    # that copy, and the source from that line feed on is not read. The
+    # column advances by the grapheme clusters, not the characters, between
+    # the end of the number and the start of what the copy holds after the
+    # units, the dropped text included. Both are reproduced here, the corpus
+    # fixing neither: `5d x`, a line feed and `y` scans as 5, `d` and `x` at
+    # column 6, then the end of input; `5dh`, a line feed and `x` scans as
+    # 5, `d`, `h` and the end of input at column 8.
     module Numbers
       # The units a duration names, the two-letter spellings first.
       UNIT = /m[so]|[ydhmsw]/
@@ -46,37 +49,40 @@ module Predicator
       end
 
       def units
-        column = @column
-        names = []
+        text = +""
+        dropped = nil
         while (unit = @scanner.scan(UNIT))
-          names << unit
-          @tokens << Token.new(type: :duration_unit, line: @line, column:, length: unit.length, value: unit)
-          column += unit.length
+          @tokens << Token.new(type: :duration_unit, line: @line, column: @column + text.length,
+                               length: unit.length, value: unit)
+          text << unit
+          dropped ||= keep_line
         end
-        @column += consumed(names.join)
+        @column += consumed(text, dropped)
         nil
       end
 
-      # The grapheme clusters the units and any dropped text spanned, as the
-      # reference counts them. The units are ASCII letters, so only the
-      # cluster just after them can join the last; a carriage return before
-      # the dropped line feed joins it.
-      def consumed(unit_text)
+      # After the first unit: goes on scanning over the text from here to the
+      # first line feed past its first character alone, and answers the text
+      # dropped after it ("" when the kept text runs to the end of the source).
+      def keep_line
         line = @scanner.check(/.[^\n]*/m) || ""
-        count = "#{unit_text}#{@scanner.check(/\X/)}".scan(/\X/).size - (line.empty? ? 0 : 1)
-        return count if ends_source?(line)
+        return "" if @scanner.pos + line.bytesize == @scanner.string.bytesize
 
-        count + drop_after(line).scan(/\X/).size - (line.end_with?("\r") ? 1 : 0)
-      end
-
-      def ends_source?(line) = @scanner.pos + line.bytesize == @scanner.string.bytesize
-
-      # Goes on scanning over the line alone, and answers the text dropped.
-      def drop_after(line)
         dropped = @scanner.string.byteslice((@scanner.pos + line.bytesize)..)
         @scanner = StringScanner.new(line)
         @chain_end = 0
         dropped
+      end
+
+      # The grapheme clusters the units and the dropped text spanned, as the
+      # reference counts them. The units are ASCII letters, so only the
+      # cluster just after them can join the last; a carriage return ending
+      # the kept text joins the dropped line feed.
+      def consumed(unit_text, dropped)
+        count = "#{unit_text}#{@scanner.check(/\X/)}".scan(/\X/).size - (@scanner.eos? ? 0 : 1)
+        return count if dropped.empty?
+
+        count + dropped.scan(/\X/).size - (!@scanner.eos? && @scanner.string.end_with?("\r") ? 1 : 0)
       end
     end
     private_constant :Numbers

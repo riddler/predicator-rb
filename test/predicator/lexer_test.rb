@@ -62,7 +62,7 @@ class LexerTest < Minitest::Test
   end
 
   # sabotage: go on over the whole rest of the source after a duration
-  # (`return count` at the head of Numbers#consumed); `y` on the next line
+  # (`return ""` at the head of Numbers#keep_line); `y` on the next line
   # is read and the first assert_equal fails.
   def test_the_scan_stops_at_the_first_line_feed_after_a_duration_as_the_reference_does
     assert_equal [[:integer, 1, 1, 1, 5], [:duration_unit, 1, 2, 1, "d"], [:identifier, 1, 6, 1, "x"],
@@ -70,6 +70,40 @@ class LexerTest < Minitest::Test
     assert_equal [[:identifier, 1, 5, 1, "x"], [:eof, 1, 6, 0, nil]], scanned("5d x\r\ny").last(2)
     assert_equal [:identifier, 2, 1, 3, "foo"], scanned("5d\nfoo\nbar")[2]
     assert_equal [:eof, 2, 1, 0, nil], scanned("5h\n\n x").last
+  end
+
+  # The reference's answers, read from its compiled build at v9.5.0, where
+  # a run of units is followed by text that holds a line feed: the kept
+  # text starts after the first unit, so a line feed right after the last
+  # unit of a longer run drops the rest.
+  UNIT_RUNS = {
+    "5dh\nx\ny" => [[:integer, 1, 1, 1, 5], [:duration_unit, 1, 2, 1, "d"], [:duration_unit, 1, 3, 1, "h"],
+                    [:eof, 1, 8, 0, nil]],
+    "next 2dh\n+ 1" => [[:next_op, 1, 1, 4, "next"], [:integer, 1, 6, 1, 2], [:duration_unit, 1, 7, 1, "d"],
+                        [:duration_unit, 1, 8, 1, "h"], [:eof, 1, 13, 0, nil]],
+    "5msh\nz" => [[:integer, 1, 1, 1, 5], [:duration_unit, 1, 2, 2, "ms"], [:duration_unit, 1, 4, 1, "h"],
+                  [:eof, 1, 7, 0, nil]],
+    "5dh\r\nx" => [[:integer, 1, 1, 1, 5], [:duration_unit, 1, 2, 1, "d"], [:duration_unit, 1, 3, 1, "h"],
+                   [:eof, 1, 5, 0, nil]],
+    "5dh x\ny" => [[:integer, 1, 1, 1, 5], [:duration_unit, 1, 2, 1, "d"], [:duration_unit, 1, 3, 1, "h"],
+                   [:identifier, 1, 7, 1, "x"], [:eof, 1, 8, 0, nil]],
+    "5d\nfoo\nbar" => [[:integer, 1, 1, 1, 5], [:duration_unit, 1, 2, 1, "d"], [:identifier, 2, 1, 3, "foo"],
+                       [:eof, 2, 4, 0, nil]],
+    "5dhms\n1" => [[:integer, 1, 1, 1, 5], [:duration_unit, 1, 2, 1, "d"], [:duration_unit, 1, 3, 1, "h"],
+                   [:duration_unit, 1, 4, 2, "ms"], [:eof, 1, 8, 0, nil]],
+    "1.5hm\nx" => [[:fractional_number, 1, 1, 3, FRACTION.new(whole: 1, fraction: "5")],
+                   [:duration_unit, 1, 4, 1, "h"], [:duration_unit, 1, 5, 1, "m"], [:eof, 1, 8, 0, nil]]
+  }.freeze
+
+  # sabotage: keep the text after the last unit instead of the first (move
+  # `dropped ||= keep_line` after the loop in Numbers#units, as
+  # `dropped = keep_line`); "5dh\nx\ny" reads `x` on line 2 and the
+  # assert_empty fails.
+  def test_a_run_of_units_keeps_the_text_after_its_first_unit_as_the_reference_does
+    differing = UNIT_RUNS.reject { |source, tokens| scanned(source) == tokens }.keys
+
+    assert_empty differing
+    assert_equal ["unexpected_character", [1, 4]], refusal("5d\u0301h\nx").values_at(0, 2)
   end
 
   # sabotage: count the units' characters (`unit_text.length` for the
