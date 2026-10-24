@@ -18,6 +18,9 @@ class RegistryTest < Minitest::Test
     Conformance::Runner.run(CORPUS, surface, isa_version: ISA, attempt: ->(_item) { :pass })
   end
 
+  # A report failing every case of surface the run attempts.
+  def failing(surface) = Conformance::Runner.run(CORPUS, surface, isa_version: ISA, attempt: ->(_item) { "no" })
+
   def all_passing = Conformance::SURFACES.map { |surface| passing(surface) }
 
   def entry(item, surface) = { "case_id" => item["id"], "surface" => surface, "tier" => item["tier"] }
@@ -58,7 +61,7 @@ class RegistryTest < Minitest::Test
   # problem naming the entry fails.
   def test_refuses_an_entry_that_no_longer_passes
     item = first_cases(1).first
-    reports = Conformance::Runner.observe(CORPUS)
+    reports = Conformance::SURFACES.map { |surface| failing(surface) }
 
     assert_equal ["#{item["id"]} on evaluator no longer passes"],
                  problems(registry(entries: [entry(item, "evaluator")]), reports:)

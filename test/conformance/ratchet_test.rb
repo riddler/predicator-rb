@@ -54,7 +54,7 @@ class RatchetTest < Minitest::Test
   # assert_equal on the written bytes fails.
   def test_with_nothing_passing_it_writes_the_empty_registry_pinned_to_the_corpus
     with_registry(EMPTY.merge("corpus_hash" => "sha256:#{"1" * 64}")) do |path|
-      assert_empty Conformance::Ratchet.write(path, CORPUS, Conformance::Runner.observe(CORPUS))
+      assert_empty Conformance::Ratchet.write(path, CORPUS, reports_passing([]))
       assert_equal Conformance::Registry.encode(EMPTY), File.binread(path)
     end
   end
@@ -89,7 +89,7 @@ class RatchetTest < Minitest::Test
       before = File.binread(path)
 
       assert_equal ["#{item["id"]} on evaluator no longer passes"],
-                   Conformance::Ratchet.write(path, CORPUS, Conformance::Runner.observe(CORPUS))
+                   Conformance::Ratchet.write(path, CORPUS, reports_passing([]))
       assert_equal before, File.binread(path)
     end
   end
@@ -98,7 +98,7 @@ class RatchetTest < Minitest::Test
   # written and the assertion on the refusal fails.
   def test_refuses_a_claim_the_entries_do_not_support
     with_registry do |path|
-      problems = Conformance::Ratchet.write(path, CORPUS, Conformance::Runner.observe(CORPUS),
+      problems = Conformance::Ratchet.write(path, CORPUS, reports_passing([]),
                                             claims: [{ "surface" => "compiler", "tier" => 1 }])
 
       assert_equal CORPUS.surface_set("compiler").count { |item| item["tier"] == 1 }, problems.size
@@ -123,7 +123,7 @@ class RatchetTest < Minitest::Test
   # sabotage: make Ratchet.report_problems answer []; the report of another
   # corpus is read and the assertion on the refusal fails.
   def test_refuses_a_report_of_another_corpus
-    reports = Conformance::Runner.observe(CORPUS).map { |report| report.merge("corpus_hash" => "sha256:#{"2" * 64}") }
+    reports = reports_passing([]).map { |report| report.merge("corpus_hash" => "sha256:#{"2" * 64}") }
     with_registry do |path|
       problems = Conformance::Ratchet.write(path, CORPUS, reports)
 
@@ -135,7 +135,7 @@ class RatchetTest < Minitest::Test
   # sabotage: drop the version test from Ratchet.report_problems; the
   # assert_equal on the refusal fails.
   def test_refuses_reports_that_disagree_about_the_version_claimed
-    reports = Conformance::Runner.observe(CORPUS)
+    reports = reports_passing([])
     reports[1] = reports[1].merge("isa_version" => ISA - 1)
     with_registry do |path|
       assert_equal ["the reports disagree about the instruction-set version claimed: #{ISA}, #{ISA - 1}"],
@@ -146,7 +146,7 @@ class RatchetTest < Minitest::Test
   # sabotage: make Ratchet.passes accept any id; the unknown case is entered
   # and the assert_equal on the refusal fails.
   def test_refuses_a_report_passing_a_case_the_corpus_does_not_hold
-    report = Conformance::Runner.observe(CORPUS).first
+    report = reports_passing([]).first
     report = report.merge("results" => [{ "id" => "no/such-case", "result" => "pass" }])
     with_registry do |path|
       assert_equal ["the compiler report passes no/such-case, which the corpus does not hold"],
@@ -170,7 +170,7 @@ class RatchetTest < Minitest::Test
       File.binwrite(path, "{")
 
       assert_match(/\Aregistry.json: the registry is not JSON/,
-                   Conformance::Ratchet.write(path, CORPUS, Conformance::Runner.observe(CORPUS)).first)
+                   Conformance::Ratchet.write(path, CORPUS, reports_passing([])).first)
     end
   end
 end
