@@ -48,11 +48,20 @@ class EvaluatorObjectsTest < Minitest::Test
   def test_object_set_checks_depth_then_takes_a_map_alone
     assert_fails "EvaluationError", "insufficient_operands", [["lit", 5], %w[object_set a]]
     assert_fails "EvaluationError", "insufficient_operands", [%w[object_set a]]
-    [5, nil, Predicator::UNDEFINED, [1], Predicator::Duration.new(days: 1), date(2024, 1, 15), instant(0)]
-      .each do |target|
-        assert_fails "EvaluationError", "invalid_stack_value", [["lit", target], ["lit", 1], %w[object_set a]]
-      end
+    [5, nil, Predicator::UNDEFINED, [1], date(2024, 1, 15), instant(0)].each do |target|
+      assert_fails "EvaluationError", "invalid_stack_value", [["lit", target], ["lit", 1], %w[object_set a]]
+    end
     assert_fails "EvaluationError", "invalid_stack_value", [%w[load missing], ["lit", 1], %w[object_set a]]
+  end
+
+  # sabotage: drop the line that reads a Duration target as its map in
+  # RichTypes#object_set; the duration is refused and answer's
+  # assert_predicate fails on the first call.
+  def test_object_set_on_a_duration_answers_the_map_of_its_units
+    units = %w[years months weeks days hours minutes seconds milliseconds].to_h { |name| [name, 0] }
+    written = answer([["lit", Predicator::Duration.new(days: 2)], ["lit", 1], %w[object_set a]])
+    assert_equal units.merge("days" => 2, "a" => 1), written
+    assert_instance_of Hash, answer([["lit", Predicator::Duration.new], ["lit", 3], %w[object_set days]])
   end
 
   # Asserts each row [left, operator, right, expected], where left and right
