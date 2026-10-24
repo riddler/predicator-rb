@@ -7,10 +7,10 @@ module Predicator
     # {Machine} runs for `access`, `bracket_access`, `in`, `contains` and
     # `make_list`, and the rules they read through.
     #
-    # A duration reads as the map its shape is: each of its eight unit names
-    # answers that unit, and any other key misses. (The reference answers the
-    # unit for a duration the host supplied and misses for one a program
-    # built; a duration here is one value wherever it came from.)
+    # A duration reads as the map its shape is, as the reference's ISA
+    # (section 3) makes it normative: each of its eight unit names answers
+    # that unit, and any other key misses. A duration is one value wherever
+    # it came from, a literal, an opcode or the host.
     module Access
       # The keys a duration answers.
       DURATION_UNITS = %w[years months weeks days hours minutes seconds milliseconds].freeze
