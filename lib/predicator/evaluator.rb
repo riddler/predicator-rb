@@ -7,6 +7,7 @@ require_relative "float_text"
 require_relative "evaluator/chronology"
 require_relative "evaluator/arithmetic"
 require_relative "evaluator/access"
+require_relative "evaluator/rich_types"
 
 module Predicator
   # The stack machine that runs an instruction list against a context, in
@@ -26,7 +27,10 @@ module Predicator
   # method; the loop, the operand check and the halt rules do not change.
   #
   # Options are per call: nothing here is configured globally, and every
-  # evaluation builds its own Machine.
+  # evaluation builds its own Machine. That includes the clock: an
+  # instruction that reads the time reads the clock the caller passed, at
+  # most once per evaluation, so every such instruction in one evaluation
+  # reads the same instant.
   module Evaluator
     # The instruction-set version this build runs: an opcode retired at or
     # below it is refused.
@@ -37,14 +41,26 @@ module Predicator
     # undefined is what the program answers); :error stops at the load.
     UNBOUND_POLICIES = %i[undefined error].freeze
 
+    # The clock an evaluation reads when the caller passes none: the system's
+    # real-time clock, read to the microsecond, as an instant in UTC. It
+    # holds no state.
+    SYSTEM_CLOCK = lambda do
+      micros = Process.clock_gettime(Process::CLOCK_REALTIME, :microsecond)
+      Predicator::DateTime.new(epoch_seconds: micros.div(1_000_000), microsecond: micros % 1_000_000)
+    end
+
     # One instruction's row: the shape of each operand, the version that
     # retired it (nil while it is live) and the Machine method that runs it.
-    Row = Data.define(:operands, :removed_in, :handler)
+    Row = Data.define(:operands, :removed_in, :handler) do
+      # Whether the opcode was retired at or below {ISA_VERSION}.
+      def retired? = !removed_in.nil? && removed_in <= ISA_VERSION
+    end
 
     # Each operand shape, as a test of one operand.
     SHAPES = {
       value: ->(_operand) { true },
       string: ->(operand) { operand.is_a?(String) },
+      list: ->(operand) { operand.is_a?(Array) },
       comparison_operator: ->(operand) { Compare::OPERATORS.include?(operand) },
       positive_integer: ->(operand) { operand.is_a?(Integer) && operand.positive? },
       count: ->(operand) { operand.is_a?(Integer) && !operand.negative? }
@@ -54,7 +70,7 @@ module Predicator
     # retired at instruction-set version 3; they keep their rows so that a
     # list carrying them is refused as retired rather than as unknown.
     INSTRUCTIONS = {
-      "lit" => Row.new(operands: [:value], removed_in: nil, handler: :push_literal),
+      "lit" => Row.new(operands: [:value], removed_in: nil, handler: :push),
       "load" => Row.new(operands: [:string], removed_in: nil, handler: :load_root),
       "compare" => Row.new(operands: [:comparison_operator], removed_in: nil, handler: :compare),
       "not" => Row.new(operands: [], removed_in: nil, handler: :logical_not),
@@ -74,6 +90,10 @@ module Predicator
       "in" => Row.new(operands: [], removed_in: nil, handler: :membership_in),
       "contains" => Row.new(operands: [], removed_in: nil, handler: :membership_contains),
       "make_list" => Row.new(operands: [:count], removed_in: nil, handler: :make_list),
+      "duration" => Row.new(operands: [:list], removed_in: nil, handler: :duration),
+      "relative_date" => Row.new(operands: [:string], removed_in: nil, handler: :relative_date),
+      "object_new" => Row.new(operands: [], removed_in: nil, handler: :object_new),
+      "object_set" => Row.new(operands: [:string], removed_in: nil, handler: :object_set),
       "and" => Row.new(operands: [], removed_in: 3, handler: nil),
       "or" => Row.new(operands: [], removed_in: 3, handler: nil)
     }.freeze
@@ -83,34 +103,49 @@ module Predicator
     # @param instructions [Array] the instruction list
     # @param context [Hash{String => Object}] the variables a load reads
     # @param on_unbound [Symbol] one of {UNBOUND_POLICIES}
+    # @param now [#call, nil] the clock: called with no argument, it answers
+    #   the current time as a {Predicator::DateTime}. It is called at most
+    #   once, and only when an instruction reads the time. nil means
+    #   {SYSTEM_CLOCK}.
     # @return [Result] the top of the stack at halt, or the error that
     #   stopped the run
-    # @raise [ArgumentError] when an argument is not of its kind (a caller's
-    #   bug, not an outcome of the program)
-    def self.evaluate(instructions, context = {}, on_unbound: :undefined)
+    # @raise [ArgumentError] when an argument is not of its kind, or the
+    #   clock answers something other than a {Predicator::DateTime} (a
+    #   caller's bug, not an outcome of the program)
+    def self.evaluate(instructions, context = {}, on_unbound: :undefined, now: nil)
       raise ArgumentError, "instructions must be an Array, not #{instructions.inspect}" unless instructions.is_a?(Array)
       raise ArgumentError, "context must be a Hash, not #{context.inspect}" unless context.is_a?(Hash)
+
+      check_options(on_unbound, now)
+      Machine.new(instructions, context, on_unbound, now || SYSTEM_CLOCK).run
+    end
+
+    def self.check_options(on_unbound, now)
       unless UNBOUND_POLICIES.include?(on_unbound)
         raise ArgumentError, "on_unbound must be one of #{UNBOUND_POLICIES.inspect}, not #{on_unbound.inspect}"
       end
-
-      Machine.new(instructions, context, on_unbound).run
+      raise ArgumentError, "now must respond to call, not #{now.inspect}" unless now.nil? || now.respond_to?(:call)
     end
+    private_class_method :check_options
 
-    # One evaluation: the program, the context, the policy, the stack and the
-    # first root a load did not find bound. Each handler answers the index
-    # of the next instruction, or the error value that stops the run. The
-    # handlers of the arithmetic opcodes are in {Arithmetic}, and those of
-    # access, membership and list construction in {Access}; Machine includes
-    # both.
+    # One evaluation: the program, the context, the policy, the clock, the
+    # stack and the first root a load did not find bound. Each handler
+    # answers the index of the next instruction, or the error value that
+    # stops the run. The
+    # handlers of the arithmetic opcodes are in {Arithmetic}, those of
+    # access, membership and list construction in {Access}, and those of
+    # durations, relative dates and maps in {RichTypes}; Machine includes
+    # all three.
     class Machine
       include Arithmetic
       include Access
+      include RichTypes
 
-      def initialize(program, context, on_unbound)
+      def initialize(program, context, on_unbound, clock)
         @program = program
         @context = context
         @on_unbound = on_unbound
+        @clock = clock
         @stack = []
         @unbound = nil
       end
@@ -144,7 +179,7 @@ module Predicator
       # only then does it run.
       def step(instruction, at)
         named = INSTRUCTIONS[instruction.first] if instruction.is_a?(Array)
-        return retired(instruction.first, named.removed_in) if named && retired?(named)
+        return retired(instruction.first, named.removed_in) if named&.retired?
 
         row = row_for(instruction)
         return unknown(at) unless row
@@ -165,10 +200,6 @@ module Predicator
         @stack.push(value)
         at + 1
       end
-
-      def push_literal(at, value) = push(at, value)
-
-      def retired?(row) = !row.removed_in.nil? && row.removed_in <= ISA_VERSION
 
       # A root the context binds is read as it is, null and undefined
       # included; one it does not bind is undefined, recorded for the halt

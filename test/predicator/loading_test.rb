@@ -23,8 +23,8 @@ class LoadingTest < Minitest::Test
   def test_the_codec_loads_on_its_own_and_the_main_entry_point_leaves_it_out
     codec = %w[civil errors result tagged tagged/reader tagged/writer values].map { |f| "predicator/#{f}.rb" }
     main = ["predicator.rb"] + %w[civil errors evaluator evaluator/access evaluator/arithmetic
-                                  evaluator/chronology evaluator/compare evaluator/order float_text result values
-                                  version]
+                                  evaluator/chronology evaluator/compare evaluator/order evaluator/rich_types
+                                  float_text result values version]
            .map { |f| "predicator/#{f}.rb" }
 
     assert_equal %(["constant", "constant", #{codec.inspect}]\n), loaded_by("predicator/tagged")
