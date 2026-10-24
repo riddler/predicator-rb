@@ -118,4 +118,15 @@ class EvaluatorCastsTest < Minitest::Test
     assert_undefined(units.merge("days" => "2"), "string")
     assert_undefined(units, "integer")
   end
+
+  # sabotage: let the duration's own units win in RichTypes#object_set
+  # ({ key => value }.merge(target)); "days" set to 5 writes "3d" and the
+  # first assert_equal fails.
+  def test_a_unit_name_object_set_writes_on_a_duration_is_the_unit_the_cast_reads
+    set = ->(key, value) { run_list([["duration", [[3, "d"]]], ["lit", value], ["object_set", key], %w[cast string]]) }
+    assert_equal "5d", set.call("days", 5).value
+    assert_equal "3d500ms", set.call("milliseconds", 500).value
+    assert_equal "3d", set.call("note", 1).value
+    assert_same Predicator::UNDEFINED, set.call("days", 2.5).value
+  end
 end

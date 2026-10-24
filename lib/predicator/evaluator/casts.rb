@@ -34,12 +34,18 @@ module Predicator
     # A map carrying the seven units the reference's duration always holds
     # (years to seconds), each an Integer, casts as a duration: it passes
     # through `::duration` and is written by `::string` in the literal
-    # grammar. `object_set` on a duration answers the map of its units, and
-    # the reference's cast still passes through and formats the map its
-    # `object_set` answers there, so reading such a map as a duration keeps
-    # the cast answering as the reference does on that path. A map whose
-    # units are not all Integers casts to undefined, where the reference
-    # formats whatever values the map holds.
+    # grammar. The map is read by its String unit names, as `relative_date`
+    # reads one. `object_set` on a duration answers the map of its units
+    # with the key written; when that key is not a unit name, the cast
+    # writes the duration's own units, as the reference's cast does after
+    # its `object_set`. When the key is a unit name the two part: this reads
+    # the unit written (`days` set to 5 on `3d` writes `5d`, `milliseconds`
+    # set to 500 writes `3d500ms`, a unit set to a non-Integer is
+    # undefined), while the reference keeps its duration's own unit (`3d`),
+    # since its durations carry their units under keys a written String key
+    # does not replace. A String-keyed map from the context that carries
+    # the unit names is a duration here and undefined in the reference. A
+    # map whose units are not all Integers casts to undefined.
     #
     # The text forms `::date` and `::datetime` read are the reference's, as
     # {IsoText} states them.
