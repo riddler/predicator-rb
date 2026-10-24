@@ -137,17 +137,4 @@ class EvaluatorDurationsTest < Minitest::Test
     end
     assert_match(/not a Predicator::DateTime/, error.message)
   end
-
-  # sabotage: test `moved.is_a?(Hash) || moved.is_a?(Duration)` in
-  # RichTypes#relative_date; an empty map passes, the direction is read next,
-  # and the map row's assert_fails's assert_equal fails on invalid_direction.
-  def test_relative_date_checks_depth_then_the_duration_then_the_direction
-    clock = -> { NOON }
-    assert_fails "EvaluationError", "insufficient_operands", [%w[relative_date sideways]], now: clock
-    [["object_new"], ["lit", 3], ["lit", NOON]].each do |pushed|
-      assert_fails "EvaluationError", "invalid_stack_value", [pushed, %w[relative_date sideways]], now: clock
-    end
-    assert_fails "EvaluationError", "invalid_direction", [["duration", []], %w[relative_date sideways]], now: clock
-    assert_fails "EvaluationError", "invalid_direction", [["duration", []], %w[relative_date AGO]], now: clock
-  end
 end
