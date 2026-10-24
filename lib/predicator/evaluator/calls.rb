@@ -90,6 +90,7 @@ module Predicator
         return host_call(name, callable, args) if @functions.key?(name)
 
         Answered.new(callable.call(*args))
+      rescue ClockFault then raise
       rescue Refusal => e
         call_error(e.message)
       rescue StandardError => e

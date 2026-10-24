@@ -132,9 +132,8 @@ class EvaluatorDurationsTest < Minitest::Test
   # NOON is accepted as the clock and the first assert_raises fails.
   def test_a_clock_of_the_wrong_kind_is_a_callers_bug
     assert_raises(ArgumentError) { run_list([["lit", 1]], clock: NOON) }
-    error = assert_raises(ArgumentError) do
-      run_list([["duration", [[1, "d"]]], %w[relative_date ago]], clock: -> { Time.at(0) })
-    end
+    error = assert_fails("EvaluationError", "clock_failed", [["duration", [[1, "d"]]], %w[relative_date ago]],
+                         clock: -> { Time.at(0) })
     assert_match(/not a Predicator::DateTime/, error.message)
   end
 end
