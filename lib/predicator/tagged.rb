@@ -31,16 +31,17 @@ module Predicator
   # integer stays an Integer and a float a Float across a round trip: `1`
   # decodes to 1 and `1.0` to 1.0, and 1.0 encodes as `1.0`.
   module Tagged
-    # The deepest a text may nest its brackets and braces, a tag's own braces
-    # counted. Both directions hold to it, so every text {encode} writes is
-    # one {decode} reads.
+    # The deepest a text may nest its brackets and braces, 100 levels, a
+    # tag's own braces counted. Both directions hold to it, so every text
+    # {encode} writes is one {decode} reads.
     DEPTH_LIMIT = 100
+    private_constant :DEPTH_LIMIT
 
     # Why a text could not be decoded or a value encoded. Its reason is one
     # of these tokens:
     #
     # - "malformed_json": the text is not JSON (or not UTF-8)
-    # - "depth_limit_exceeded": the text or value nests past {DEPTH_LIMIT}
+    # - "depth_limit_exceeded": the text or value nests past 100 levels
     # - "non_finite_number": a number that is not finite
     # - "invalid_tagged_value": an object with a `$type` key that is not one
     #   of the four tags, or a tag whose value is not what the tag carries;
