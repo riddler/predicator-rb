@@ -34,10 +34,20 @@ class EvaluatorCastDatesTest < Minitest::Test
   # sabotage: drop the "-00:00" refusal in IsoText.read_offset; that text
   # reads as UTC and its assert_undefined fails.
   def test_offsets_the_reference_refuses_are_undefined
-    %w[-00:00 +24:00 +05:60 +5:30 +05:30:00 z +-5:30].each do |zone|
+    %w[-00:00 +24:00 +05:60 +5:30 +05:30:00 z].each do |zone|
       assert_undefined("2026-08-09T10:00:00#{zone}", "datetime")
     end
     assert_undefined("2026-08-09T10:00:00", "datetime")
+  end
+
+  # sabotage: let each offset field take a sign (`[-0-9][0-9]` for
+  # `[0-9]{2}` in the offset of IsoText::DATETIME_TEXT and in
+  # IsoText::OFFSET_TEXT); "+-5:30" reads as an instant and its
+  # assert_undefined fails.
+  def test_an_offset_field_carrying_a_sign_is_undefined
+    %w[+-5:30 +05:-3 +-530 +-5].each do |zone|
+      assert_undefined("2026-08-09T10:00:00#{zone}", "datetime")
+    end
   end
 
   # sabotage: read three fraction digits in IsoText.local_instant ([0, 3]

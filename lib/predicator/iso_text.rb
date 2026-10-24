@@ -17,6 +17,13 @@ module Predicator
   # year in UTC falls outside {YEARS} is refused (the reference raises
   # there).
   #
+  # Each field of the offset is two digits. The reference's ISA (docs/isa.md,
+  # section 5) asks `::datetime` for an ISO 8601 datetime with a UTC offset,
+  # and an ISO 8601 offset's hour and minute fields are digits with no sign
+  # of their own, so a text such as `+-5:30` is refused here. The
+  # reference's host parser reads each field as an integer that may carry a
+  # sign and answers an instant for it.
+  #
   # The module holds no state. It is private to the package.
   module IsoText
     DATE_TEXT = /\A([+-]?)([0-9]{4})-([0-9]{2})-([0-9]{2})\z/

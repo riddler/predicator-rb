@@ -32,9 +32,14 @@ module Predicator
     #   reads it.
     #
     # A map carrying the seven units the reference's duration always holds
-    # (years to seconds), each an Integer, is a duration here as it is
-    # everywhere else in the evaluator: it passes through `::duration` and
-    # is written by `::string`.
+    # (years to seconds), each an Integer, casts as a duration: it passes
+    # through `::duration` and is written by `::string` in the literal
+    # grammar. `object_set` on a duration answers the map of its units, and
+    # the reference's cast still passes through and formats the map its
+    # `object_set` answers there, so reading such a map as a duration keeps
+    # the cast answering as the reference does on that path. A map whose
+    # units are not all Integers casts to undefined, where the reference
+    # formats whatever values the map holds.
     #
     # The text forms `::date` and `::datetime` read are the reference's, as
     # {IsoText} states them.
