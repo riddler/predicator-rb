@@ -33,14 +33,15 @@ module Predicator
 
       private
 
-      # A decimal too long for a finite Float reads as an infinite one: the
-      # reference's lexer raises there, and refusing the literal is left to
-      # the stage that emits it.
+      # A decimal too large for a finite Float reads as an infinite one, and
+      # is read without asking the host for it ({FloatText.read}): the
+      # reference's lexer raises there, and the emitter refuses the literal.
       def number
         text = @scanner.scan(/[0-9]+(?:\.[0-9]+)?/)
         whole, fraction = text.split(".")
         unless @scanner.match?(UNIT)
-          return emit(fraction ? :float : :integer, fraction ? Float(text) : Integer(whole, 10), text.length)
+          value = fraction ? FloatText.read(text) || Float::INFINITY : Integer(whole, 10)
+          return emit(fraction ? :float : :integer, value, text.length)
         end
 
         leading = fraction ? Fraction.new(whole: Integer(whole, 10), fraction:) : Integer(whole, 10)
