@@ -1,0 +1,9 @@
+{
+"claims": [
+],
+"corpus_hash": "sha256:ddc5cf824b06b4899e1bd4166263a1ee07016ff239216e029b9276ac17243975",
+"entries": [
+],
+"implementation": "predicator-rb",
+"isa_version": 6
+}

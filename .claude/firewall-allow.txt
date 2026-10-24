@@ -1,0 +1,15 @@
+# Exact strings the maintainers' planning-reference scan may pass. Each is a
+# numbered list defined inside this repository's tree, never a reference to
+# anything outside it. One exact string per line; a line starting with "# "
+# is a comment. An entry allows a match only where the entry's text covers it
+# on the same line, so each entry is kept to the few words around the one it
+# allows.
+#
+# conformance/schema/registry.json is copied byte for byte from the reference
+# implementation and is never edited here. Its claims description cites the
+# completeness check by the number the reference's ratchet contract gives it
+# (the fifth of the five checks of its check step); the reference's own
+# allow file carries the same entry for the same line.
+
+# conformance/schema/registry.json
+rule R5). May
