@@ -26,6 +26,17 @@ class VersionTest < Minitest::Test
     assert_empty spec.runtime_dependencies
   end
 
+  # sabotage: add Dir.glob("conformance/**/*") to the gemspec's files; the
+  # assertion that every shipped file is under lib/ or a top-level document
+  # fails.
+  def test_gemspec_ships_lib_and_the_documents_only
+    spec = Gem::Specification.load(GEMSPEC)
+
+    refute_empty spec.files
+    assert(spec.files.all? { |file| file.start_with?("lib/") || %w[README.md CHANGELOG.md LICENSE].include?(file) },
+           "the gem ships #{spec.files.reject { |file| file.start_with?("lib/") }.inspect}")
+  end
+
   # sabotage: set required_ruby_version to ">= 3.2" in the gemspec; the
   # assertion on the requirement string fails.
   def test_gemspec_requires_ruby_3_3_or_later

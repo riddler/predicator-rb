@@ -2,6 +2,9 @@
 
 require "minitest/test_task"
 require "rubocop/rake_task"
+require_relative "test/conformance/corpus_check"
+require_relative "test/conformance/ratchet"
+require_relative "test/conformance/runner"
 
 RuboCop::RakeTask.new
 
@@ -12,6 +15,53 @@ RuboCop::RakeTask.new
 Minitest::TestTask.create(:test) do |t|
   t.test_prelude = %(require "simplecov")
   t.test_globs = ["test/**/*_test.rb"]
+end
+
+# The conformance apparatus under conformance/ (its README says what is
+# copied and from where). The code these tasks call lives in
+# test/conformance/, beside the suite that tests it; none of it ships.
+namespace :corpus do
+  desc "Check the vendored corpus and transcripts against their records"
+  task :check do
+    problems = Conformance::CorpusCheck.problems
+    unless problems.empty?
+      abort ["corpus:check failed:", *problems, "per-file digests, to find what moved:",
+             *Conformance::CorpusCheck.digests, "Restore the copied bytes or vendor a tag; never rewrite a hash."]
+        .join("\n  ")
+    end
+    puts Conformance::CorpusCheck.summary
+  end
+end
+
+# A stage of the gate: every check conformance/RATCHET.md puts over the
+# registry, against a run of both surfaces made now.
+desc "Check conformance/registry.json against the corpus and a run made now"
+task :registry do
+  corpus = Conformance::Corpus.load
+  reports = Conformance::Runner.observe(corpus)
+  problems = Conformance::RegistryCheck.problems(File.binread(Conformance::Registry::PATH), corpus, reports,
+                                                 Conformance::Attempts::ISA_VERSION)
+  abort ["registry failed:", *problems].join("\n  ") unless problems.empty?
+
+  entries = JSON.parse(File.read(Conformance::Registry::PATH))["entries"]
+  Conformance::SURFACES.each do |surface|
+    unentered = Conformance::Registry.unentered(corpus, surface, entries).size
+    puts "registry: #{surface}: #{unentered} of #{corpus.surface_set(surface).size} cases without an entry"
+  end
+end
+
+# Verify-then-add, the only writer of conformance/registry.json: it runs both
+# surfaces now and adds what passed. Claims are asserted as task arguments,
+# e.g. rake "ratchet[evaluator:2,compiler:1]".
+desc "Run both surfaces and add every observed pass to conformance/registry.json"
+task :ratchet do |_task, args|
+  claims = args.extras.map { |text| Conformance::Ratchet.parse_claim(text) || abort("ratchet: #{text} is not surface:tier") }
+  corpus = Conformance::Corpus.load
+  problems = Conformance::Ratchet.write(Conformance::Registry::PATH, corpus, Conformance::Runner.observe(corpus),
+                                        claims:)
+  abort ["ratchet refused; nothing was written:", *problems].join("\n  ") unless problems.empty?
+
+  puts "ratchet: wrote #{Conformance::Registry::PATH.delete_prefix("#{__dir__}/")}"
 end
 
 # The publish step of .github/workflows/release.yml, which publishes through
@@ -61,4 +111,4 @@ task :release do
 end
 
 # The full gate.
-task default: %i[rubocop test]
+task default: %i[rubocop corpus:check registry test]

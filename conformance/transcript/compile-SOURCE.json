@@ -1,0 +1,19 @@
+{
+  "repo": "riddler/predicator-ex",
+  "tag": "v9.4.4",
+  "sha": "ecff778ef5469a6b062968fc04e948614d97e9be",
+  "corpus_hash": "sha256:ddc5cf824b06b4899e1bd4166263a1ee07016ff239216e029b9276ac17243975",
+  "elixir": "1.18.3",
+  "otp": "27",
+  "isa_version": 6,
+  "counts": {
+    "compile": 63,
+    "decompile": 45,
+    "program": 35,
+    "program_refusal": 29,
+    "refusal": 27,
+    "rows": 199
+  },
+  "generator": "node scripts/reference-compile.mjs --from <export of riddler/predicator-ex at v9.4.4> --tag v9.4.4",
+  "transcript_hash": "sha256:c8e29a457c23f3c01c2bd7ab25552ddbca2fa7f8fb427f59d627d8354f32283c"
+}

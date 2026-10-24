@@ -145,19 +145,21 @@ against its conformance corpus. It is the rubygems gem `predicator`
 runtime dependencies, on Ruby 3.3 or later.
 
 The tree on `main` today is the scaffold of the 2.0.0 package: an empty
-`Predicator` module, the gemspec, the `Rakefile` and the gate (rubocop, then
-the tests under SimpleCov), CI (`.github/workflows/ci.yml`) and the release
-workflow (`.github/workflows/release.yml`). The 2019 gem is deleted; its 1.x
-source lives in the riddler/predicator repository under `impl/rb`. The
-vendored corpus arrives with a later change; until it does, the sentences in
-this file about it describe the target, not the current tree.
+`Predicator` module, the gemspec, the `Rakefile` and the gate (rubocop, the
+corpus and registry checks, then the tests under SimpleCov), CI
+(`.github/workflows/ci.yml`), the release workflow
+(`.github/workflows/release.yml`) and the conformance apparatus: the corpus
+vendored under `conformance/`, and its runner, checks and ratchet under
+`test/conformance/`. The 2019 gem is deleted; its 1.x source lives in the
+riddler/predicator repository under `impl/rb`.
 
 - **The gem is `predicator`.** Version 2.0.0 is a breaking major on the same
   gem: the 1.x line was a different implementation, its API is gone from
   2.0.0, and 1.x releases stay installable from rubygems.org.
-- **The corpus is the arbiter.** `conformance/` will hold the corpus
-  vendored from predicator-ex at a release tag, its tag, commit and hash
-  recorded in `conformance/SOURCE.json`. The vendored files are never edited,
+- **The corpus is the arbiter.** `conformance/` holds the corpus vendored
+  from predicator-ex at a release tag, its tag, commit and hash recorded in
+  `conformance/SOURCE.json` (`conformance/README.md` says what is copied and
+  what is this repository's own). The vendored files are never edited,
   and every case passes with no skip list: a case this port cannot pass is
   reported against predicator-ex with its evidence, never skipped or worked
   round here. An answer the corpus does not fix follows predicator-ex at that
@@ -182,8 +184,9 @@ mise exec -- bundle exec rake         # full gate
 ### This repo's own gate rules
 
 - The full gate is `mise exec -- bundle exec rake`, the `Rakefile`'s
-  default task: rubocop, the corpus check once the corpus is vendored, and
-  the tests under SimpleCov at a 90 percent minimum. The inner loop is
+  default task: rubocop, the corpus check (`rake corpus:check`), the
+  registry check (`rake registry`), and the tests under SimpleCov at a 90
+  percent minimum. The inner loop is
   `mise exec -- bundle exec rake test`. Only the full command is the
   advancement gate: a `rake test` run, like any scoped run, is never evidence
   for a claim that the gate is green.

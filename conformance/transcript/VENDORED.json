@@ -1,0 +1,12 @@
+{
+  "repo": "riddler/predicator-ts",
+  "tag": "v0.7.0",
+  "sha": "64111e3337271664b19ad684b5651e87ad1b9ec1",
+  "path": "conformance/transcript",
+  "files": {
+    "compile-SOURCE.json": "sha256:72ad27d4af11279074e3ef1a1a00c31d0bf70f6e749e8bbc05ac53a3034f1e26",
+    "compile.json": "sha256:c8e29a457c23f3c01c2bd7ab25552ddbca2fa7f8fb427f59d627d8354f32283c",
+    "tokens-SOURCE.json": "sha256:4cf0209b7402a51856ffc0b0953927cc89cc6dfd8107f277fe25511a738a2797",
+    "tokens.json": "sha256:dabfb98bc23e1536c51bcec8eff7836befe673891c135827720c3d2694f6179c"
+  }
+}
