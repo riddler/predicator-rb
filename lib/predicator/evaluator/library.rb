@@ -77,24 +77,27 @@ module Predicator
       end
 
       # The grapheme clusters from start, all of them or length of them. A
-      # start or a length past the end answers what the string has.
-      def string_substring(value, start, length = nil)
-        substring_types(value, start, length)
-        substring_signs(start, length)
+      # start or a length past the end answers what the string has. The
+      # call's shape is its count of arguments, so a third argument of null
+      # is a length that is not an Integer, not a missing one.
+      def string_substring(value, start, *length)
+        two = length.empty?
+        substring_types(value, start, length, two)
+        substring_signs(start, length.first, two)
         clusters = value.grapheme_clusters
-        (clusters[start, length || clusters.size] || []).join
+        (clusters[start, two ? clusters.size : length.first] || []).join
       end
 
-      def substring_types(value, start, length)
-        return if value.is_a?(String) && start.is_a?(Integer) && (length.nil? || length.is_a?(Integer))
+      def substring_types(value, start, length, two)
+        return if value.is_a?(String) && start.is_a?(Integer) && length.all?(Integer)
 
-        raise Calls::Refusal, SUBSTRING_TYPES.fetch(length.nil?)
+        raise Calls::Refusal, SUBSTRING_TYPES.fetch(two)
       end
 
-      def substring_signs(start, length)
-        return unless start.negative? || length&.negative?
+      def substring_signs(start, length, two)
+        return unless start.negative? || (!two && length.negative?)
 
-        raise Calls::Refusal, "substring() expects a non-negative start index#{" and length" if length}"
+        raise Calls::Refusal, "substring() expects a non-negative start index#{" and length" unless two}"
       end
 
       def list_concat(left, right)
