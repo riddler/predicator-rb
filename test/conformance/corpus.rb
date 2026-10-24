@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "../../lib/predicator/tagged"
 
 # The conformance apparatus: the corpus vendored under conformance/, the run
 # over it, the corpus check and the registry. It lives under test/ because it
@@ -82,10 +83,18 @@ module Conformance
       end
     end
 
+    # Every line is read through the package's own tagged codec
+    # (Predicator::Tagged), so a case's context, instructions and expected
+    # result arrive as predicator values: a tagged date as a Predicator::Date,
+    # {"$type":"undefined"} as Predicator::UNDEFINED, 1.0 as a Float. A line
+    # the codec refuses is refused here, naming the codec's reason.
     def self.parse_line(line, path, number)
-      JSON.parse(line)
-    rescue JSON::ParserError => e
-      raise CorpusError, "#{File.basename(path)} line #{number} is not JSON: #{e.message}"
+      result = Predicator::Tagged.decode(line)
+      return result.value if result.ok?
+
+      error = result.error
+      what = error.reason == "malformed_json" ? "is not JSON" : "does not decode"
+      raise CorpusError, "#{File.basename(path)} line #{number} #{what} (#{error.reason}): #{error.message}"
     end
 
     def corpus_hash = manifest.fetch("corpus_hash")

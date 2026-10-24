@@ -11,12 +11,16 @@ module Conformance
   # exception: a case is never skipped and never aborts the run (the
   # never-skip rule of the reference's conformance/README.md).
   #
+  # A case reaches an attempt already decoded through Predicator::Tagged
+  # (Corpus.parse_line): its instructions, context and expected_result hold
+  # predicator values, not the encoding's tags.
+  #
   # Nothing is implemented yet, so both surfaces answer a fail naming the gap
   # for every case, and no case can enter the registry. The change that adds
-  # the evaluator replaces the "evaluator" lambda with one that decodes the
-  # case's tagged instructions and context, runs them through the public
-  # evaluate entry point, and compares the answer with expected_result, or the
-  # error's type and reason with expected_error; the change that adds the
+  # the evaluator replaces the "evaluator" lambda with one that runs the
+  # case's instructions and context through the public evaluate entry point,
+  # and compares the answer with expected_result, or the error's type and
+  # reason with expected_error; the change that adds the
   # compiler does the same for "compiler", comparing its compilation of the
   # case's source with the case's instructions. ISA_VERSION gives way to the
   # package's own accessor when the public surface has one.
