@@ -67,6 +67,14 @@ class EvaluatorLibraryTest < Minitest::Test
     assert_equal "substring() expects a string and an integer start index", refused("substring", 1, 0)
   end
 
+  # sabotage: read the shape as `two = length.compact.empty?` in
+  # Library#string_substring; a null length is read as the two-argument
+  # call, answers that call's sentence, and the assert_equal fails.
+  def test_a_null_length_is_a_length_that_is_not_an_integer
+    three = "substring() expects a string, an integer start index, and an integer length"
+    assert_equal([three] * 3, [["abc", 0], [1, 0], ["abc", -1]].map { |args| refused("substring", *args, nil) })
+  end
+
   # sabotage: drop the second String check in Library#two_strings; a
   # Integer prefix reaches start_with? and the first assert_equal reads a
   # raised TypeError's sentence instead.

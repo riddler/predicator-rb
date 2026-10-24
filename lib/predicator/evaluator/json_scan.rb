@@ -2,63 +2,165 @@
 
 module Predicator
   module Evaluator
-    # The bytes of a JSON text's scalars - its strings, numbers and three
-    # literals - as {JsonScan} reads them, and the faults it reports. Each
-    # method reads from the scan's offset, `@at`, over its bytes, `@bytes`,
-    # and moves the offset past what it read, or throws `:fault` with the
-    # reason the text is refused with.
-    module JsonScalars
+    # What every part of {JsonScan} shares: the byte at its offset, `@at`,
+    # over its bytes, `@bytes`, and the faults it throws as `:fault` with the
+    # sentence the text is refused with. The reference's reader reports
+    # three kinds: an unexpected byte at its offset, the end of the input,
+    # and a sequence it cannot read (its own report of that last kind is a
+    # term of its host language, so a sequence here is reported in a
+    # sentence of the same form as the other two).
+    module JsonFaults
+      private
+
+      # The byte at the scan, or nil at the end.
+      def here = @bytes.getbyte(@at)
+
+      # The byte at the scan; the end of the text is a fault here.
+      def present = here || ending(@at)
+
+      def expect(byte)
+        unexpected unless present == byte
+        @at += 1
+      end
+
+      def unexpected
+        throw :fault, format("Invalid JSON: unexpected byte 0x%<byte>02X at position %<at>d", byte: present, at: @at)
+      end
+
+      def ending(at) = throw(:fault, "Invalid JSON: unexpected end of input at position #{at}")
+      def sequence(at) = throw(:fault, "Invalid JSON: unexpected sequence at position #{at}")
+    end
+    private_constant :JsonFaults
+
+    # A JSON string's bytes, as the reference's reader reads them: a control
+    # byte must be escaped; the bytes from 0x80 must be well-formed UTF-8,
+    # refused at the first byte where the sequence breaks; and a `\u` escape
+    # must have its four hexadecimal digits, a high surrogate must be
+    # followed by a `\u` escape of a low surrogate, and a low surrogate must
+    # not stand alone.
+    #
+    # Where the reference reads an escape's bytes ahead, it reports a text
+    # too short to hold them (six bytes from the backslash, twelve for a
+    # surrogate pair) as the end of the whole input, not of the string.
+    module JsonStrings
+      include JsonFaults
+
       # The bytes a backslash in a string may precede, but for `u`.
       ESCAPES = '"\\/bfnrt'.bytes.freeze
+      # For each UTF-8 lead byte, the range each byte after it must fall in.
+      CONTINUATIONS = [
+        [0xC2..0xDF, [0x80..0xBF]], [0xE0..0xE0, [0xA0..0xBF, 0x80..0xBF]],
+        [0xE1..0xEC, [0x80..0xBF] * 2], [0xED..0xED, [0x80..0x9F, 0x80..0xBF]], [0xEE..0xEF, [0x80..0xBF] * 2],
+        [0xF0..0xF0, [0x90..0xBF] + ([0x80..0xBF] * 2)], [0xF1..0xF3, [0x80..0xBF] * 3],
+        [0xF4..0xF4, [0x80..0x8F] + ([0x80..0xBF] * 2)]
+      ].freeze
+      # The high and the low surrogates.
+      HIGH = 0xD800..0xDBFF
+      LOW = 0xDC00..0xDFFF
+
+      private
+
+      # A string, from its opening quote past its closing one.
+      def string
+        @at += 1
+        content(present) until here == 0x22
+        @at += 1
+        :after
+      end
+
+      # One byte of a string's content, and what it opens.
+      def content(byte)
+        case byte
+        when 0x5C then escape
+        when 0x00..0x1F then unexpected
+        when 0x80..0xFF then utf8(byte)
+        else @at += 1
+        end
+      end
+
+      def utf8(lead)
+        ranges = CONTINUATIONS.find { |leads, _| leads.cover?(lead) }&.last || unexpected
+        @at += 1
+        ranges.each do |range|
+          unexpected unless range.cover?(present)
+          @at += 1
+        end
+      end
+
+      # An escape, from its backslash.
+      def escape
+        start = @at
+        @at += 1
+        return unicode(start) if present == 0x75
+
+        unexpected unless ESCAPES.include?(present)
+        @at += 1
+      end
+
+      def unicode(start)
+        code = code_at(start)
+        @at = start + 6
+        return unless HIGH.cover?(code) || LOW.cover?(code)
+
+        sequence(start) if LOW.cover?(code)
+        low_half(start)
+      end
+
+      # The low surrogate a high one at start must be followed by.
+      def low_half(start)
+        ending(@bytes.bytesize) if @bytes.bytesize - start < 12
+        unexpected unless @bytes.byteslice(start + 6, 2) == "\\u"
+        sequence(start) unless LOW.cover?(digits(start + 6))
+        @at = start + 12
+      end
+
+      # The code a `\u` escape at start names.
+      def code_at(start)
+        ending(@bytes.bytesize) if @bytes.bytesize - start < 6
+        digits(start) || sequence(start)
+      end
+
+      def digits(start)
+        hex = @bytes.byteslice(start + 2, 4)
+        hex.to_i(16) if hex.match?(/\A\h{4}\z/)
+      end
+    end
+    private_constant :JsonStrings
+
+    # The scalars of a JSON text besides its strings: numbers and the three
+    # literals. A number too large for a Float is a sequence the reference
+    # cannot read, reported at the number's first byte.
+    module JsonScalars
+      include JsonStrings
+
       # The literal each first byte begins.
       LITERALS = { 0x74 => "true", 0x66 => "false", 0x6E => "null" }.transform_values(&:bytes).freeze
 
       private
 
-      # A string's bytes up to its closing quote. A control byte must be
-      # escaped; every other byte, a UTF-8 continuation byte included, is
-      # content.
-      def string
-        @at += 1
-        until present == 0x22
-          unexpected if here < 0x20
-          @at += 1
-          escape if @bytes.getbyte(@at - 1) == 0x5C
-        end
-        @at += 1
+      def number
+        start = @at
+        @at += 1 if here == 0x2D
+        present == 0x30 ? @at += 1 : digits_run
+        fraction_and_exponent
+        token = @bytes.byteslice(start, @at - start)
+        sequence(start) if token.match?(/[.eE]/) && !JSON.parse(token).finite?
         :after
       end
 
-      def escape
-        byte = present
-        unexpected unless byte == 0x75 || ESCAPES.include?(byte)
-        @at += 1
-        4.times { hex_digit } if byte == 0x75
-      end
-
-      def hex_digit
-        unexpected unless present.chr.match?(/\h/)
-        @at += 1
-      end
-
-      def number
-        @at += 1 if here == 0x2D
-        present == 0x30 ? @at += 1 : digits
+      def fraction_and_exponent
         if here == 0x2E
           @at += 1
-          digits
+          digits_run
         end
-        exponent if [0x65, 0x45].include?(here)
-        :after
-      end
+        return unless [0x65, 0x45].include?(here)
 
-      def exponent
         @at += 1
         @at += 1 if [0x2B, 0x2D].include?(here)
-        digits
+        digits_run
       end
 
-      def digits
+      def digits_run
         unexpected unless present.between?(0x30, 0x39)
         @at += 1 while here&.between?(0x30, 0x39)
       end
@@ -67,35 +169,20 @@ module Predicator
         bytes.each { |byte| expect(byte) }
         :after
       end
-
-      def expect(byte)
-        unexpected unless present == byte
-        @at += 1
-      end
-
-      # The byte at the scan, or nil at the end.
-      def here = @bytes.getbyte(@at)
-
-      # The byte at the scan; the end of the text is a fault here.
-      def present
-        here || throw(:fault, "Invalid JSON: unexpected end of input at position #{@at}")
-      end
-
-      def unexpected
-        throw :fault, format("Invalid JSON: unexpected byte 0x%<byte>02X at position %<at>d", byte: present, at: @at)
-      end
     end
     private_constant :JsonScalars
 
-    # Finds the first fault in a JSON text, by byte offset, the way the
-    # reference's JSON reader reports one. JSON.parse is asked to read only a
+    # Finds the first fault in a JSON text, by byte offset, as the
+    # reference's JSON reader reports it. JSON.parse is asked to read only a
     # text this has accepted, because the sentence a malformed text is
     # refused with names the offending byte and its offset, and Ruby's
     # parser's own messages are its own.
     #
-    # The scan walks the text's bytes once, keeping the open lists and maps
-    # on a stack of its own rather than recursing, so a deeply nested text
-    # cannot exhaust Ruby's stack. It holds no state between scans.
+    # Content after the value is refused at the first byte after the value,
+    # a space included, as the reference refuses it. The scan walks the
+    # text's bytes once, keeping the open lists and maps on a stack of its
+    # own rather than recursing, so a deeply nested text cannot exhaust
+    # Ruby's stack. It holds no state between scans.
     class JsonScan
       include JsonScalars
 
@@ -108,13 +195,12 @@ module Predicator
       # "depth_limit_exceeded" when it nests past limit levels; nil when it
       # is one.
       #
-      # @param text [String] UTF-8 text
+      # @param text [String] the text, its bytes read as UTF-8
       # @param limit [Integer] the deepest level of lists and maps accepted
       # @return [String, nil]
       def self.fault(text, limit) = new(text, limit).fault
 
       def initialize(text, limit)
-        @text = text
         @bytes = text.b
         @limit = limit
         @at = 0
@@ -125,13 +211,22 @@ module Predicator
         catch(:fault) do
           space
           walk
-          space
-          unexpected if @at < @bytes.bytesize
-          encoding_fault
+          trailing
         end
       end
 
       private
+
+      # Only space may follow the value; anything else is refused at the
+      # first byte after the value.
+      def trailing
+        after = @at
+        space
+        return if @at == @bytes.bytesize
+
+        @at = after
+        unexpected
+      end
 
       # Scans one value and, while containers are open, the rest of each.
       def walk
@@ -201,20 +296,6 @@ module Predicator
 
       def space
         @at += 1 while SPACE.include?(here)
-      end
-
-      # A well-formed text whose bytes are not valid UTF-8 is refused at the
-      # first byte that is not.
-      def encoding_fault
-        return if @text.valid_encoding?
-
-        @at = 0
-        @text.each_char do |char|
-          break unless char.valid_encoding?
-
-          @at += char.bytesize
-        end
-        unexpected
       end
     end
     private_constant :JsonScan

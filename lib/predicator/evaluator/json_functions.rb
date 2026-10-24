@@ -22,9 +22,12 @@ module Predicator
     # `JSON.parse` reads a JSON text into lists, maps with String keys and
     # scalars; a duplicated key keeps its last value. A text that is not JSON
     # is refused with the reference's sentence naming the first fault and its
-    # offset in bytes: `Invalid JSON: unexpected byte 0x6F at position 1`, or
-    # `Invalid JSON: unexpected end of input at position 4`. A number too
-    # large for a Float is refused rather than read as an infinity.
+    # offset in bytes ({JsonScan}): `Invalid JSON: unexpected byte 0x6F at
+    # position 1`, or `Invalid JSON: unexpected end of input at position 4`.
+    # Where the reference reports a sequence it cannot read (an unpaired
+    # surrogate escape, a number too large for a Float), the sentence is
+    # `Invalid JSON: unexpected sequence at position N`, N the offset where
+    # the sequence starts.
     #
     # Both refuse a list or a map nested more than {DEPTH_LIMIT} levels deep
     # with the reason depth_limit_exceeded, the limit and the reason the
@@ -78,16 +81,6 @@ module Predicator
         raise Calls::Refusal, "depth_limit_exceeded"
       end
 
-      # The parsed value, refused when a number in it was too large for a
-      # Float. The text's depth is already bounded, so the walk is too.
-      def self.finite(value)
-        case value
-        when Float then value.finite? || raise(Calls::Refusal, "Invalid JSON: a number is too large for a float")
-        when Array then value.each { |member| finite(member) }
-        when Hash then value.each_value { |member| finite(member) }
-        end
-        value
-      end
       private_class_method :string, :map, :tagged, :deep
 
       private
@@ -101,11 +94,14 @@ module Predicator
       def json_parse(text)
         raise Calls::Refusal, "JSON.parse expects a string argument" unless text.is_a?(String)
 
-        utf8 = text.encoding == Encoding::UTF_8 ? text : text.dup.force_encoding(Encoding::UTF_8)
-        fault = JsonScan.fault(utf8, DEPTH_LIMIT)
+        fault = JsonScan.fault(text, DEPTH_LIMIT)
         raise Calls::Refusal, fault if fault
 
-        JsonFunctions.finite(JSON.parse(utf8, max_nesting: false, allow_duplicate_key: true))
+        JSON.parse(text, max_nesting: false, allow_duplicate_key: true)
+      rescue JSON::ParserError
+        # The scan accepts only what the reference reads, so Ruby's parser
+        # does not refuse it; if it ever does, its own text stays here.
+        raise Calls::Refusal, "Invalid JSON: the text could not be read"
       end
     end
     private_constant :JsonFunctions
