@@ -1,78 +1,26 @@
-[![Gem Version](https://badge.fury.io/rb/predicator.svg)](http://badge.fury.io/rb/predicator)
-[![Build Status](https://travis-ci.org/predicator/predicator.svg?branch=master)](https://travis-ci.org/predicator/predicator)
-[![Coverage Status](https://coveralls.io/repos/github/predicator/predicator/badge.svg?branch=master)](https://coveralls.io/github/predicator/predicator?branch=master)
-
 # Predicator
 
-Predicator is a safe (does not eval code), admin or business user facing predicate engine. It turns a string predicate like `"score > 600 or (score > 580 and monthly_income > 9000)"` along with a supplied context into a `true` or `false`. This predicate can be stored as an attribute of a model (ex: an Offer model could store a predicate indicating if it is available to a customer).
+A safe, non-evaluating condition language for end users, for Ruby.
 
-## Usage
+This is the 2.0.0 rewrite, in progress: the gem `predicator` is being
+rebuilt as a compiler from a condition's source text to stack-machine
+instructions plus an evaluator, wire-compatible with the Elixir reference
+implementation, [predicator-ex](https://github.com/riddler/predicator-ex). The
+head holds the package scaffold and its quality gate only; there is no
+public API yet, and the full README arrives with it.
 
-Simple usage:
-
-```ruby
-require "predicator"
-
-Predicator.evaluate "score > 600 or (score > 580 and income > 9000)", score: 590 # false
-
-Predicator.evaluate "score > 600 or (score > 580 and income > 9000)", score: 590, income: 9500 # true
-```
-
-Example usage with a model:
-
-```ruby
-class Customer
-  ...
-  def to_hash
-    {
-      ...
-      score: score,
-      income: income,
-      ...
-    }
-  end
-end
-
-class Offer
-  attr_accessor :available_predicate
-  
-  ...
-  
-  def available_to? customer
-    Predicator.evaluate available_predicate, customer.to_hash
-  end
-end
-```
-
-## Installation
-
-Add this line to your application's Gemfile:
-
-```ruby
-gem "predicator"
-```
-
-And then execute:
-
-    $ bundle
-
-Or install it yourself as:
-
-    $ gem install predicator
+The 1.x gem is a different implementation. Its source lives in the
+[riddler/predicator](https://github.com/riddler/predicator) repository under
+`impl/rb`, and 1.x releases stay installable from rubygems.org.
 
 ## Development
 
-After checking out the repo, run `bin/setup` to install dependencies.
-Then, run `rake test` (or just `rake`) to run the tests. You can also run `bin/console` for an interactive prompt that will allow you to experiment.
-
-To install this gem onto your local machine, run `bundle exec rake install`.
-
-## Contributing
-
-Bug reports and pull requests are welcome on GitHub at https://github.com/predicator/predicator.
-This project is intended to be a safe, welcoming space for collaboration, and contributors are expected to adhere to the [Contributor Covenant](http://contributor-covenant.org) code of conduct.
-
+```bash
+mise install                          # the Ruby that mise.toml pins
+mise exec -- bundle install           # the dev tools
+mise exec -- bundle exec rake         # the gate: rubocop, then the tests
+```
 
 ## License
 
-The gem is available as open source under the terms of the [MIT License](http://opensource.org/licenses/MIT).
+MIT, see `LICENSE`.
