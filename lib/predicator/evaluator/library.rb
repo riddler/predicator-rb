@@ -113,7 +113,7 @@ module Predicator
       # The date a date names, or the date in UTC an instant falls on.
       def civil_date(name, value)
         return value if value.is_a?(Predicator::Date)
-        return value.to_date if value.is_a?(Predicator::DateTime)
+        return Civil.date_of(value) if value.is_a?(Predicator::DateTime)
 
         raise Calls::Refusal, "#{name}() expects a date or datetime argument"
       end

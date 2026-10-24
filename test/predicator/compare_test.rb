@@ -142,7 +142,7 @@ class CompareTest < Minitest::Test
     assert_compares true, [[{ "a" => date("2024-01-15") }], 1], "LT", [[{ "a" => at(1_705_276_800) }], 2]
   end
 
-  # sabotage: drop the size test from Compare.map_equal?; a map equals a
+  # sabotage: drop the size test from Compare.peers_equal?; a map equals a
   # wider one holding its keys and the assert_compares on the wider map
   # fails.
   def test_maps_are_equal_by_key_and_member_and_have_no_order

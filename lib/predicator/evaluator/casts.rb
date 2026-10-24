@@ -125,7 +125,7 @@ module Predicator
       def cast_to_date(value)
         case value
         when Predicator::Date then value
-        when Predicator::DateTime then value.to_date
+        when Predicator::DateTime then Civil.date_of(value)
         when String then IsoText.read_date(value) || UNDEFINED
         else UNDEFINED
         end
@@ -134,7 +134,7 @@ module Predicator
       def cast_to_datetime(value)
         case value
         when Predicator::DateTime then value
-        when Predicator::Date then Predicator::DateTime.at(value)
+        when Predicator::Date then Civil.instant_at(value)
         when String then IsoText.read_datetime(value) || UNDEFINED
         else UNDEFINED
         end

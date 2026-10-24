@@ -87,7 +87,7 @@ class ParserTest < Minitest::Test
 
     assert_trees({ "1" => lit(1), "1.5" => lit(1.5), "true" => lit(true), "false" => lit(false), "null" => lit(nil),
                    "undefined" => lit(Predicator::UNDEFINED), "#2024-01-15#" => lit(day),
-                   "#2024-01-15T10:00:00Z#" => lit(Predicator::DateTime.at(day, 10)),
+                   "#2024-01-15T10:00:00Z#" => lit(CIVIL.instant_at(day, 10)),
                    '"x"' => str("x", :double), "'x'" => str("x") })
   end
 

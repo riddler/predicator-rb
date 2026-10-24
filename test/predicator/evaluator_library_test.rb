@@ -88,8 +88,8 @@ class EvaluatorLibraryTest < Minitest::Test
     assert_equal "concat() expects two list arguments", refused("concat", [1], 2)
   end
 
-  # sabotage: drop `.to_date` in Library#civil_date; a DateTime has no
-  # year, the call raises, and value's assert_predicate fails.
+  # sabotage: drop the Civil.date_of line in Library#civil_date; a
+  # DateTime has no year, the call raises, and value's assert_predicate fails.
   def test_the_date_functions_read_a_datetime_in_utc
     last = Predicator::DateTime.new(epoch_seconds: 1_704_067_199) # 2023-12-31T23:59:59Z
     assert_equal([2023, 12, 31], %w[Date.year Date.month Date.day].map { |name| value(name, last) })

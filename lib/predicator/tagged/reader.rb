@@ -102,14 +102,14 @@ module Predicator
       end
 
       def in_carried_years(instant)
-        instant if instant.to_date.year.between?(0, 9999)
+        instant if Civil.date_of(instant).year.between?(0, 9999)
       end
 
       def local_instant((year, month, day, hour, minute, second), fraction)
         return unless Civil.civil?(year, month, day) && hour <= 23 && minute <= 59 && second <= 59
 
         microsecond = Integer("#{fraction}000000"[0, 6], 10)
-        DateTime.at(Date.new(year:, month:, day:), hour, minute, second, microsecond:)
+        Civil.instant_at(Date.new(year:, month:, day:), hour, minute, second, microsecond:)
       end
 
       def read_offset(zone)

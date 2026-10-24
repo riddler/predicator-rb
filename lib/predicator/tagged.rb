@@ -115,9 +115,9 @@ module Predicator
     def self.encode!(value) = unwrap(encode(value))
 
     def self.refusing
-      Result.ok(yield)
+      Results.ok(yield)
     rescue Refused => e
-      Result.failure(CodecError.new(reason: e.reason, message: e.message))
+      Results.failure(CodecError.new(reason: e.reason, message: e.message))
     end
 
     def self.unwrap(result)

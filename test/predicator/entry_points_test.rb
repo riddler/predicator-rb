@@ -5,7 +5,7 @@ require "test_helper"
 # The public entry points that run a program, parse a source or read a
 # duration, their bang variants, and the options a run takes.
 class EntryPointsTest < Minitest::Test
-  NOON = Predicator::DateTime.at(Predicator::Date.new(2026, 1, 2), 12)
+  NOON = CIVIL.instant_at(Predicator::Date.new(2026, 1, 2), 12)
 
   def described(error) = [error.type, error.reason]
 
@@ -18,7 +18,7 @@ class EntryPointsTest < Minitest::Test
     assert_equal %w[EvaluationError division_by_zero], described(Predicator.evaluate("1 / 0").error)
   end
 
-  # sabotage: answer Result.ok(ran.context) whatever ran.ok? says in
+  # sabotage: answer Results.ok(ran.context) whatever ran.ok? says in
   # Predicator.execute; a stopped run answers its partial context and the
   # refute_predicate fails.
   def test_execute_answers_the_context_at_halt_and_never_changes_the_one_passed
@@ -33,7 +33,7 @@ class EntryPointsTest < Minitest::Test
     assert_equal %w[ParseError expected_primary], described(Predicator.execute("x =").error)
   end
 
-  # sabotage: answer Result.ok([ran.value, ran.context]) whatever ran.ok?
+  # sabotage: answer Results.ok([ran.value, ran.context]) whatever ran.ok?
   # says in Predicator.execute_value; a stopped run answers a value and the
   # refute_predicate fails.
   def test_execute_value_answers_the_last_expression_value_and_the_context_and_no_value_on_a_stop
@@ -58,7 +58,7 @@ class EntryPointsTest < Minitest::Test
     assert_raises(ArgumentError) { Predicator.parse(:x) }
   end
 
-  # sabotage: answer Result.ok(tokens) for a refused scan in
+  # sabotage: answer Results.ok(tokens) for a refused scan in
   # Predicator.parse; "x & y" answers a token list and the assert_equal on
   # its error fails.
   def test_parse_refuses_what_compile_refuses_with_the_same_error
@@ -67,7 +67,7 @@ class EntryPointsTest < Minitest::Test
     end
   end
 
-  # sabotage: answer Result.ok(duration) whatever DurationText.read answers
+  # sabotage: answer Results.ok(duration) whatever DurationText.read answers
   # in Predicator.parse_duration; "1x" answers a nil value and the
   # refute_predicate fails.
   def test_parse_duration_reads_the_literal_spelling_or_refuses_it

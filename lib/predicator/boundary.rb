@@ -25,7 +25,8 @@ module Predicator
   # - "non_finite_number": a Float that is not finite;
   # - "cyclic_value": a list or a map that contains itself;
   # - "depth_limit_exceeded": lists and maps nested past {DEPTH_LIMIT}
-  #   levels, the outermost counting as the first.
+  #   levels along any path, the outermost counting as the first, a list or
+  #   map shared by several paths measured along each.
   #
   # The walks are iterative, so a value deeper than the stack is refused
   # rather than exhausting it, and each list or map is walked once however
@@ -129,9 +130,12 @@ module Predicator
 
     # One check of one value: a depth-first walk over an explicit stack. A
     # list or a map is :open, on the path, from when its members are queued
-    # until the marker queued beneath them is reached, and :done from then
-    # on; meeting an open one again is a cycle, and a done one is not walked
-    # twice.
+    # until the marker queued beneath them is reached; meeting an open one
+    # again is a cycle. From then on it holds its height, the levels it
+    # nests including itself, and is not walked again: a path that reaches
+    # it at a depth where depth plus height passes the limit by one is
+    # refused, so the limit holds along every path however much of the value
+    # is shared.
     class Check
       def initialize
         @state = {}.compare_by_identity
@@ -152,17 +156,35 @@ module Predicator
 
       private
 
-      def leave(container) = @state[container] = :done
+      # Marks a container walked, with its height: one more than its
+      # tallest member's, a member that is not a list or a map counting 0.
+      def leave(container)
+        tallest = Boundary.members(container).map { |member| Boundary.container?(member) ? @state[member] : 0 }.max
+        @state[container] = 1 + (tallest || 0)
+      end
 
       # The fault of a list or a map, or nil having queued its members; nil
-      # for any other value and for one already walked.
+      # for any other value and for one already walked whose height fits.
       def container_fault(value, depth)
-        return unless Boundary.container?(value) && @state[value] != :done
-        return ["cyclic_value", "holds a list or a map that contains itself"] if @state[value] == :open
-        return ["depth_limit_exceeded", "nests past #{DEPTH_LIMIT} levels"] if depth > DEPTH_LIMIT
+        return unless Boundary.container?(value)
+
+        state = @state[value]
+        return state_fault(state, depth) if state
+
+        return too_deep if depth > DEPTH_LIMIT
 
         (value.is_a?(Hash) && Boundary.key_fault(value)) || enter(value, depth)
       end
+
+      # The fault of meeting a container again: a cycle while it is open,
+      # too deep when its height from this depth passes the limit.
+      def state_fault(state, depth)
+        return ["cyclic_value", "holds a list or a map that contains itself"] if state == :open
+
+        too_deep if depth + state - 1 > DEPTH_LIMIT
+      end
+
+      def too_deep = ["depth_limit_exceeded", "nests past #{DEPTH_LIMIT} levels"]
 
       def enter(container, depth)
         @state[container] = :open
