@@ -73,7 +73,7 @@ class EvaluatorObjectsTest < Minitest::Test
   end
 
   # sabotage: drop the date_against_datetime? refusal from
-  # Compare#members_equal?; a date member equals a datetime member at its
+  # Compare.member_rule; a date member equals a datetime member at its
   # midnight and the third row's assert_equal fails.
   def test_dates_and_instants_in_built_maps_are_equal_by_value_and_have_no_order
     january = date(2024, 1, 15)

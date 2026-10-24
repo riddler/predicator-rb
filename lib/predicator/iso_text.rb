@@ -75,10 +75,10 @@ module Predicator
       return unless date && hour <= 23 && minute <= 59 && second <= 59
 
       microsecond = Integer("#{fraction}000000"[0, 6], 10)
-      DateTime.at(date, hour, minute, second, microsecond:)
+      Civil.instant_at(date, hour, minute, second, microsecond:)
     end
 
-    def in_years(instant) = (instant if YEARS.cover?(instant.to_date.year))
+    def in_years(instant) = (instant if YEARS.cover?(Civil.date_of(instant).year))
 
     # The seconds the offset stands east of UTC, or nil when the reference
     # refuses it.

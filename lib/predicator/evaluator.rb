@@ -282,7 +282,7 @@ module Predicator
       end
 
       # Runs in expression mode: the answer is the top of the stack at halt.
-      def run = drive&.then { |error| Result.failure(error) } || halt
+      def run = drive&.then { |error| Results.failure(error) } || halt
 
       # Runs in statement mode: the answer is the context at halt. Neither
       # halt rule of expression mode applies, as there is no stack value to
@@ -310,11 +310,11 @@ module Predicator
       # an unbound-variable error naming the first root a load did not find,
       # when a load did not find one.
       def halt
-        return Result.failure(EvaluationError.new(reason: "empty_stack", message: "the stack is empty at halt")) \
+        return Results.failure(EvaluationError.new(reason: "empty_stack", message: "the stack is empty at halt")) \
           if @stack.empty?
-        return Result.failure(unbound(@unbound)) if UNDEFINED.equal?(@stack.last) && @unbound
+        return Results.failure(unbound(@unbound)) if UNDEFINED.equal?(@stack.last) && @unbound
 
-        Result.ok(@stack.last)
+        Results.ok(@stack.last)
       end
 
       # A retired opcode is refused by its name whatever its operands, as the

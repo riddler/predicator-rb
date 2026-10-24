@@ -76,25 +76,6 @@ module Predicator
   # @!attribute [r] microsecond
   #   @return [Integer] the microsecond of that second, 0 to 999999
   DateTime = Data.define(:epoch_seconds, :microsecond) do
-    # The instant at a civil date and a time of day, in UTC.
-    #
-    # @param date [Date]
-    # @param hour [Integer] 0 to 23
-    # @param minute [Integer] 0 to 59
-    # @param second [Integer] 0 to 59
-    # @param microsecond [Integer] 0 to 999999
-    # @return [DateTime]
-    # @raise [ArgumentError] when a part is out of its range
-    def self.at(date, hour = 0, minute = 0, second = 0, microsecond: 0)
-      clock = [hour, minute, second]
-      unless date.is_a?(Date) && clock.zip([23, 59, 59]).all? { |part, top| Civil.within?(part, top) }
-        raise ArgumentError, "#{date.inspect} at #{clock.inspect} does not name a time of day on a date"
-      end
-
-      seconds = (Civil.days_of(date) * Civil::SECONDS_PER_DAY) + (hour * 3600) + (minute * 60) + second
-      new(epoch_seconds: seconds, microsecond:)
-    end
-
     # @param epoch_seconds [Integer]
     # @param microsecond [Integer] 0 to 999999
     # @raise [ArgumentError] when a part is not an Integer in its range
@@ -106,20 +87,6 @@ module Predicator
       super
     end
 
-    # The civil date of this instant, in UTC.
-    #
-    # @return [Date]
-    def to_date = Civil.date_of_days(epoch_seconds.div(Civil::SECONDS_PER_DAY))
-
-    # @return [Integer] the hour of the day, 0 to 23, in UTC
-    def hour = seconds_of_day / 3600
-
-    # @return [Integer] the minute of the hour, 0 to 59
-    def minute = (seconds_of_day % 3600) / 60
-
-    # @return [Integer] the second of the minute, 0 to 59
-    def second = seconds_of_day % 60
-
     # The instant as canonical ISO 8601 text in UTC: the fraction left out
     # when the microsecond is zero and exactly six digits when it is not
     # (the form the tagged encoding and the reference's string cast both
@@ -129,13 +96,18 @@ module Predicator
     def to_s
       fraction = microsecond.zero? ? "" : format(".%06d", microsecond)
       format("%<date>sT%<hour>02d:%<minute>02d:%<second>02d%<fraction>sZ",
-             date: to_date, hour:, minute:, second:, fraction:)
+             date: Civil.date_of(self), hour:, minute:, second:, fraction:)
     end
 
     # @return [String]
     def inspect = "#<Predicator::DateTime #{self}>"
 
     private
+
+    # The hour of the day, 0 to 23, the minute and the second, in UTC.
+    def hour = seconds_of_day / 3600
+    def minute = (seconds_of_day % 3600) / 60
+    def second = seconds_of_day % 60
 
     def seconds_of_day = epoch_seconds % Civil::SECONDS_PER_DAY
   end

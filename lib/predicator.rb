@@ -16,14 +16,24 @@ require_relative "predicator/emitter"
 # that does not compile, a run that stops, a value outside the domain all
 # answer a failed result carrying an error value. Each has a bang variant
 # (`compile!`, `evaluate!`, ...) that answers the value itself or raises
-# {Predicator::Error} carrying the same error value. A caller's own bug (an
-# argument of the wrong kind, an unknown or malformed option) raises
-# ArgumentError.
+# {Predicator::Error} carrying the same error value. Equality, ordering and
+# membership walk nested lists and maps without recursing, so a value a
+# program nests to any depth is compared, never overflowing the stack.
+#
+# Two things still raise. A caller's own bug (an argument of the wrong kind,
+# an unknown or malformed option, a clock that answers something other than
+# a {Predicator::DateTime}) raises ArgumentError. And an exception that is
+# not a StandardError (an Interrupt, a SystemExit, a NoMemoryError), raised
+# by host code a run calls (a host function or the clock), propagates
+# unchanged: it is the host failing, not an outcome of the program.
 #
 # The value domain is Ruby's own values where they fit - nil (null), true and
-# false, Integer and Float (kept apart), String, Array (a list) and Hash with
-# String keys (a map) - plus {Predicator::UNDEFINED}, {Predicator::Date},
-# {Predicator::DateTime} and {Predicator::Duration}. The codec for the
+# false, Integer and Float (kept apart), String, Array (a list) and Hash (a
+# map, keyed by a String, an Integer, true, false, nil or
+# {Predicator::UNDEFINED}) - plus {Predicator::UNDEFINED},
+# {Predicator::Date}, {Predicator::DateTime} (built with
+# `Predicator::DateTime.new(epoch_seconds:, microsecond:)`) and
+# {Predicator::Duration}. The codec for the
 # conformance corpus's tagged encoding is loaded on its own, with
 # `require "predicator/tagged"`.
 #
@@ -34,9 +44,10 @@ require_relative "predicator/emitter"
 #   to `call`), the host's functions for this run. A function is called with
 #   the call's arguments only, first argument first, each a copy, so that
 #   nothing it does to one changes the context; the counts of arguments it
-#   takes are read from its parameters; it refuses by raising, which fails
-#   the run with an EvaluationError whose reason and message are
-#   `Function NAME() raised: ` and the exception's inspect; an answer
+#   takes are read from its parameters; it refuses by raising a
+#   StandardError, which fails the run with an EvaluationError whose reason
+#   and message are `Function NAME() raised: ` and the exception's inspect;
+#   an answer
 #   outside the value domain fails the run too. A name here shadows the
 #   library function of the same name, for this run only. `{}` by default.
 # - `clock:` a callable answering the current time as a
@@ -52,10 +63,11 @@ require_relative "predicator/emitter"
 #   fails with the reason `loop_budget_exceeded`.
 #
 # A context, and any `lit` operand of an instruction list the host built, is
-# checked against the value domain before anything runs: a key that is not a
-# String, a value the domain has no member for (a Symbol, a Time, any other
-# object), a Float that is not finite, a list or map that contains itself or
-# nests past 100 levels each fail the run with an EvaluationError (reasons
+# checked against the value domain before anything runs: a root key of the
+# context that is not a String, a map key or a value the domain has no member
+# for (a Symbol, a Time, any other object), a Float that is not finite, a
+# list or map that contains itself, and lists and maps nested past 100
+# levels along any path each fail the run with an EvaluationError (reasons
 # `unsupported_host_value`, `non_finite_number`, `cyclic_value`,
 # `depth_limit_exceeded`).
 module Predicator
@@ -156,7 +168,7 @@ module Predicator
     return instructions if instructions.is_a?(Result)
 
     refused = refusal_of(instructions, context)
-    refused ? Result.failure(refused) : Evaluator.evaluate(instructions, context, **)
+    refused ? Results.failure(refused) : Evaluator.evaluate(instructions, context, **)
   end
 
   # As {evaluate}, answering the value itself.
@@ -192,7 +204,7 @@ module Predicator
     ran = statements(program, context, **)
     return ran if ran.is_a?(Result)
 
-    ran.ok? ? Result.ok(ran.context) : Result.failure(ran.error)
+    ran.ok? ? Results.ok(ran.context) : Results.failure(ran.error)
   end
 
   # As {execute}, answering the context itself.
@@ -228,7 +240,7 @@ module Predicator
     ran = statements(program, context, **)
     return ran if ran.is_a?(Result)
 
-    ran.ok? ? Result.ok([ran.value, ran.context]) : Result.failure(ran.error)
+    ran.ok? ? Results.ok([ran.value, ran.context]) : Results.failure(ran.error)
   end
 
   # As {execute_value}, answering the pair itself.
@@ -261,7 +273,7 @@ module Predicator
   def self.parse(source)
     tokens = Lexer.tokenize(text_of(source))
     tree = refused?(tokens) ? tokens : Parser.parse(tokens)
-    refused?(tree) ? failed(tree) : Result.ok(tree)
+    refused?(tree) ? failed(tree) : Results.ok(tree)
   end
 
   # As {parse}, answering the tree itself.
@@ -293,10 +305,9 @@ module Predicator
   #   encoding
   def self.parse_duration(text)
     duration = DurationText.read(text_of(text))
-    return Result.ok(duration) if duration
+    return Results.ok(duration) if duration
 
-    Result.failure(EvaluationError.new(reason: "invalid_duration_format",
-                                       message: "Invalid duration format: #{text}"))
+    Results.failure(EvaluationError.new(reason: "invalid_duration_format", message: "Invalid duration format: #{text}"))
   end
 
   # As {parse_duration}, answering the duration itself.
@@ -318,11 +329,11 @@ module Predicator
               end
     return failed(entries) if refused?(entries)
 
-    Result.ok(entries.map(&:instruction))
+    Results.ok(entries.map(&:instruction))
   end
 
   def self.refused?(stage) = stage.is_a?(Lexer::Refusal)
-  def self.failed(refusal) = Result.failure(refusal.error)
+  def self.failed(refusal) = Results.failure(refusal.error)
 
   # The source as valid UTF-8: bytes with no encoding of their own (binary
   # or US-ASCII) are read as UTF-8, and text in any other encoding is
@@ -359,7 +370,7 @@ module Predicator
     return instructions if instructions.is_a?(Result)
 
     refused = refusal_of(instructions, context)
-    refused ? Result.failure(refused) : Evaluator.execute(instructions, context, **)
+    refused ? Results.failure(refused) : Evaluator.execute(instructions, context, **)
   end
 
   # The refusal of a context or a literal operand outside the value domain,

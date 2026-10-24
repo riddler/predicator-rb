@@ -13,22 +13,6 @@ module Predicator
   # @!attribute [r] error
   #   @return [Object, nil] the error value; nil when the result succeeded
   Result = Data.define(:value, :error) do
-    # A successful result.
-    #
-    # @param value [Object]
-    # @return [Result]
-    def self.ok(value) = new(value:, error: nil)
-
-    # A failed result.
-    #
-    # @param error [Object] an error value, never nil
-    # @return [Result]
-    def self.failure(error)
-      raise ArgumentError, "a failed result carries an error" if error.nil?
-
-      new(value: nil, error:)
-    end
-
     # @raise [ArgumentError] when it carries both a value and an error
     def initialize(value:, error:)
       raise ArgumentError, "a result carries a value or an error, not both" unless value.nil? || error.nil?
@@ -39,4 +23,23 @@ module Predicator
     # @return [Boolean] whether the call succeeded
     def ok? = error.nil?
   end
+
+  # The two ways the package builds a {Result}. Private to the package: a
+  # host reads results, it does not make them.
+  module Results
+    module_function
+
+    # A successful result.
+    def ok(value) = Result.new(value:, error: nil)
+
+    # A failed result.
+    #
+    # @raise [ArgumentError] when error is nil
+    def failure(error)
+      raise ArgumentError, "a failed result carries an error" if error.nil?
+
+      Result.new(value: nil, error:)
+    end
+  end
+  private_constant :Results
 end

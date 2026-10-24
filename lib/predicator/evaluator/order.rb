@@ -40,12 +40,47 @@ module Predicator
 
       # Two lists from the front: the first member pair that differs decides,
       # and a proper prefix orders before the longer list.
+      #
+      # The walk is iterative: a member pair of two lists is walked as a list
+      # of its own on an explicit stack of frames (the two lists and the
+      # position reached), so lists nested deeper than the stack are ordered
+      # rather than exhausting it. Any answer other than level decides the
+      # whole order at once. A nested pair that ends level (every member
+      # pair level, the sizes equal) is equal by instant, which is what makes
+      # a member pair level, so its parent steps to the next position.
       def list_order(left, right)
-        [left.size, right.size].min.times do |at|
-          step = member_order(left[at], right[at])
+        frames = [[left, right, 0]]
+        until frames.empty?
+          step = frame_step(frames)
           return step unless step == LEVEL
         end
-        left.size <=> right.size
+        LEVEL
+      end
+
+      # One step of the walk over the top frame: LEVEL to go on, else the
+      # whole walk's answer.
+      def frame_step(frames)
+        outer, inner, at = frames.last
+        return frame_end(frames) if at == [outer.size, inner.size].min
+
+        frames.last[2] = at + 1
+        pair = [outer[at], inner[at]]
+        pair.all?(Array) ? descend(frames, pair) : member_order(*pair)
+      end
+
+      # Walks a member pair of two lists as a frame of its own.
+      def descend(frames, pair)
+        frames.push([*pair, 0])
+        LEVEL
+      end
+
+      # The end of the top frame, its lists ordered by size: that order
+      # decides the walk when it is not level or when it is the outermost
+      # frame.
+      def frame_end(frames)
+        outer, inner, = frames.pop
+        order = outer.size <=> inner.size
+        frames.empty? || !order.zero? ? order : LEVEL
       end
 
       # One member pair of a list walk: LEVEL when it does not decide, else

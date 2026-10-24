@@ -34,7 +34,7 @@ class CompileTest < Minitest::Test
     assert_equal [%w[load c], ["pop_jump_if_falsy", 3], %w[load y], ["pop"]], program("if c { y }")
   end
 
-  # sabotage: answer Result.ok(nil) for a refusal in Predicator.compiled;
+  # sabotage: answer Results.ok(nil) for a refusal in Predicator.compiled;
   # the lexer's refusal is answered as a success and refute_predicate
   # fails.
   def test_each_stage_refusal_is_a_failed_result_carrying_a_parse_error

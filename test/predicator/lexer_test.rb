@@ -132,13 +132,13 @@ class LexerTest < Minitest::Test
   def test_a_date_literal_carries_its_value_and_a_datetime_is_unbounded_in_its_year
     assert_equal date(-1, 1, 1), scanned("#-0001-01-01#").first.last
     instant = scanned("#9999-12-31T23:00:00-05:00#").first.last
-    assert_equal date(10_000, 1, 1), instant.to_date
+    assert_equal date(10_000, 1, 1), CIVIL.date_of(instant)
   end
 
   # sabotage: apply no offset (return 0 at the head of IsoText.read_offset);
   # the instant reads as 10:00 UTC and the assert_equal fails.
   def test_a_datetime_literal_applies_its_offset
-    assert_equal Predicator::DateTime.at(date(2024, 1, 15), 4, 30), scanned("#2024-01-15T10:00:00+05:30#").first.last
+    assert_equal CIVIL.instant_at(date(2024, 1, 15), 4, 30), scanned("#2024-01-15T10:00:00+05:30#").first.last
   end
 
   # sabotage: read every body as a date (`return [:date, ...]` first in

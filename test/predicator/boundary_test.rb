@@ -60,6 +60,20 @@ class BoundaryTest < Minitest::Test
     assert_equal %w[EvaluationError cyclic_value], refused(Predicator.execute("y = 1", { "m" => map }))
   end
 
+  # sabotage: answer nil from Check#state_fault for a walked container
+  # (drop its height test); the shared chain is measured at its first depth
+  # only, and refused's refute_predicate fails.
+  def test_a_shared_value_is_measured_along_every_path
+    chain = (1..20_000).each_with_object([[]]) { |_, links| links << [links.last] }
+    shared = nested(90)
+    wrapped = (1..15).reduce(shared) { |inner, _| [inner] }
+
+    assert_equal %w[EvaluationError depth_limit_exceeded], refused(Predicator.evaluate("1", { "x" => chain.reverse }))
+    assert_equal %w[EvaluationError depth_limit_exceeded],
+                 refused(Predicator.evaluate("1", { "x" => [wrapped, shared] }))
+    assert_predicate Predicator.evaluate("1", { "x" => [[[[shared]]], shared] }), :ok?
+  end
+
   # sabotage: make Check#leave answer nil without marking the container
   # :done; the second path to the shared list finds it still open, it is
   # refused as cyclic, and the first assert_predicate fails.

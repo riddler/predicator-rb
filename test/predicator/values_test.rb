@@ -5,10 +5,6 @@ require "test_helper"
 # The value classes the domain adds to Ruby's own values: the one undefined,
 # civil dates, instants and durations.
 class ValuesTest < Minitest::Test
-  # The day-count conversions are private to the package, so the tests
-  # reach them by name.
-  CIVIL = Predicator.const_get(:Civil)
-
   # sabotage: make Undefined#dup answer super; the assert_same on the dup
   # fails.
   def test_undefined_is_one_value_distinct_from_nil
@@ -69,24 +65,24 @@ class ValuesTest < Minitest::Test
     assert_equal 1, { one => 1 }[other]
   end
 
-  # sabotage: drop `+ (minute * 60)` from DateTime.at; the assert_equal on
-  # the epoch seconds fails.
+  # sabotage: drop `+ (minute * 60)` from Civil.instant_at; the assert_equal
+  # on the epoch seconds fails.
   def test_a_datetime_is_built_from_a_date_and_a_time_of_day
-    instant = Predicator::DateTime.at(Predicator::Date.new(2026, 8, 6), 12, 30, 15, microsecond: 500_000)
+    instant = CIVIL.instant_at(Predicator::Date.new(2026, 8, 6), 12, 30, 15, microsecond: 500_000)
 
     assert_equal 1_786_019_415, instant.epoch_seconds
-    assert_equal [12, 30, 15, 500_000], [instant.hour, instant.minute, instant.second, instant.microsecond]
-    assert_equal Predicator::Date.new(2026, 8, 6), instant.to_date
+    assert_equal "2026-08-06T12:30:15.500000Z", instant.to_s
+    assert_equal Predicator::Date.new(2026, 8, 6), CIVIL.date_of(instant)
   end
 
   # sabotage: truncate toward zero, epoch_seconds.fdiv(86_400).to_i, in
-  # DateTime#to_date; for an instant before the epoch the date is a day late
+  # Civil.date_of; for an instant before the epoch the date is a day late
   # and the assert_equal fails.
   def test_an_instant_before_the_epoch_reads_its_civil_parts_toward_the_past
     instant = Predicator::DateTime.new(epoch_seconds: -1)
 
-    assert_equal Predicator::Date.new(1969, 12, 31), instant.to_date
-    assert_equal [23, 59, 59], [instant.hour, instant.minute, instant.second]
+    assert_equal Predicator::Date.new(1969, 12, 31), CIVIL.date_of(instant)
+    assert_equal "1969-12-31T23:59:59Z", instant.to_s
   end
 
   # sabotage: write the fraction with %d rather than %06d in DateTime#to_s;
@@ -94,16 +90,16 @@ class ValuesTest < Minitest::Test
   def test_a_datetime_writes_canonical_text
     date = Predicator::Date.new(2026, 8, 6)
 
-    assert_equal "2026-08-06T12:00:00Z", Predicator::DateTime.at(date, 12).to_s
-    assert_equal "2026-08-06T12:00:00.000005Z", Predicator::DateTime.at(date, 12, microsecond: 5).to_s
+    assert_equal "2026-08-06T12:00:00Z", CIVIL.instant_at(date, 12).to_s
+    assert_equal "2026-08-06T12:00:00.000005Z", CIVIL.instant_at(date, 12, microsecond: 5).to_s
     assert_equal "#<Predicator::DateTime 2026-08-06T12:00:00.500000Z>",
-                 Predicator::DateTime.at(date, 12, microsecond: 500_000).inspect
+                 CIVIL.instant_at(date, 12, microsecond: 500_000).inspect
   end
 
   # sabotage: define `def hash = object_id` in DateTime; the assert_equal on
   # the hash lookup fails.
   def test_datetimes_are_equal_and_hash_by_instant
-    one = Predicator::DateTime.at(Predicator::Date.new(2026, 8, 6), 12, microsecond: 5)
+    one = CIVIL.instant_at(Predicator::Date.new(2026, 8, 6), 12, microsecond: 5)
     other = Predicator::DateTime.new(epoch_seconds: one.epoch_seconds, microsecond: 5)
 
     assert_equal one, other
@@ -122,7 +118,7 @@ class ValuesTest < Minitest::Test
       end
     end
     [[date, -1], [date, 24], [date, 0, 60], ["2026-08-06"]].each do |parts|
-      assert_raises(ArgumentError, parts.inspect) { Predicator::DateTime.at(*parts) }
+      assert_raises(ArgumentError, parts.inspect) { CIVIL.instant_at(*parts) }
     end
   end
 

@@ -22,16 +22,16 @@ class TaggedTimeTest < Minitest::Test
   # written and the assert_equal on its refusal fails.
   def test_a_date_or_instant_outside_four_digit_years_is_not_encoded
     far = Predicator::Date.new(10_000, 1, 1)
-    before = Predicator::DateTime.at(Predicator::Date.new(-1, 1, 1))
+    before = CIVIL.instant_at(Predicator::Date.new(-1, 1, 1))
 
     assert_equal(%w[invalid_tagged_value invalid_tagged_value], [far, before].map { |v| refusal(Tagged.encode(v)) })
   end
 
   # sabotage: drop the microsecond: argument from Reader.local_instant's
-  # DateTime.at call; the assert_equal on the half second fails.
+  # Civil.instant_at call; the assert_equal on the half second fails.
   def test_the_datetime_tag_writes_no_fraction_or_six_digits
-    noon = Predicator::DateTime.at(DATE, 12)
-    half = Predicator::DateTime.at(DATE, 12, microsecond: 500_000)
+    noon = CIVIL.instant_at(DATE, 12)
+    half = CIVIL.instant_at(DATE, 12, microsecond: 500_000)
 
     assert_equal noon, decoded('{"$type":"datetime","value":"2026-08-06T12:00:00Z"}')
     assert_equal half, decoded('{"$type":"datetime","value":"2026-08-06T12:00:00.500000Z"}')
@@ -53,7 +53,7 @@ class TaggedTimeTest < Minitest::Test
   # sabotage: add the offset rather than subtract it in
   # Reader.read_datetime; the assert_equal on "+01:00" fails.
   def test_a_datetime_with_an_offset_reads_as_the_instant_it_names
-    eleven = Predicator::DateTime.at(DATE, 11)
+    eleven = CIVIL.instant_at(DATE, 11)
 
     %w[2026-08-06T12:00:00+01:00 2026-08-06T10:30:00-0030 2026-08-06T12:00:00+01
        2026-08-06T11:00:00+00:00].each do |text|
@@ -76,7 +76,7 @@ class TaggedTimeTest < Minitest::Test
   # line of Reader.read_offset; "-0000" is refused and the assert_equal on
   # the instants read fails.
   def test_a_negative_zero_offset_other_than_minus_00_00_reads_as_utc
-    noon = Predicator::DateTime.at(DATE, 12)
+    noon = CIVIL.instant_at(DATE, 12)
     read = %w[-0000 -00 +0000 +00].map do |zone|
       Tagged.decode(%({"$type":"datetime","value":"2026-08-06T12:00:00#{zone}"})).value
     end

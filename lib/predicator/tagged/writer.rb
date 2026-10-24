@@ -81,7 +81,7 @@ module Predicator
         case value
         when Undefined then '{"$type":"undefined"}'
         when Date then %({"$type":"date","value":"#{carried(value, value.year)}"})
-        when DateTime then %({"$type":"datetime","value":"#{carried(value, value.to_date.year)}"})
+        when DateTime then %({"$type":"datetime","value":"#{carried(value, Civil.date_of(value).year)}"})
         when Duration then duration(value)
         else Refused.raise!("unsupported_value", "#{value.inspect} is not a predicator value")
         end

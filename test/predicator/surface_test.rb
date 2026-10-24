@@ -44,15 +44,14 @@ class SurfaceTest < Minitest::Test
     },
     "classes" => {
       "Predicator::Date" => { "class" => [], "instance" => %w[day month year] },
-      "Predicator::DateTime" => { "class" => ["at"],
-                                  "instance" => %w[epoch_seconds hour microsecond minute second to_date] },
+      "Predicator::DateTime" => { "class" => [], "instance" => %w[epoch_seconds microsecond] },
       "Predicator::Duration" => { "class" => [],
                                   "instance" => %w[days hours milliseconds minutes months seconds weeks years] },
       "Predicator::Error" => { "class" => [], "instance" => ["error"] },
       "Predicator::EvaluationError" => ERROR_VALUE,
       "Predicator::ParseError" => ERROR_VALUE,
       "Predicator::Position" => { "class" => [], "instance" => %w[column line] },
-      "Predicator::Result" => { "class" => %w[failure ok], "instance" => %w[error ok? value] },
+      "Predicator::Result" => { "class" => [], "instance" => %w[error ok? value] },
       "Predicator::TypeMismatchError" => ERROR_VALUE,
       "Predicator::UndefinedVariableError" => ERROR_VALUE
     }

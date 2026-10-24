@@ -5,8 +5,8 @@ module Predicator
   # that the package needs no date library: a civil date (year, month, day) to
   # a count of days since 1970-01-01 and back, and the tests built on them.
   #
-  # Every function but the two that convert a {Predicator::Date} takes and
-  # answers Integers. The algorithms are the era-based ones published by
+  # Every function but the four that convert a {Predicator::Date} or a
+  # {Predicator::DateTime} takes and answers Integers. The algorithms are the era-based ones published by
   # Howard Hinnant ("chrono-Compatible Low-Level Date Algorithms"), exact for
   # every Integer year, so a year before 1 or after 9999 converts as well as
   # any other.
@@ -82,6 +82,21 @@ module Predicator
     # The count of days from 1970-01-01 to a {Predicator::Date}, negative
     # before it.
     def days_of(date) = days_from_civil(date.year, date.month, date.day)
+
+    # The {Predicator::DateTime} at a {Predicator::Date} and a time of day,
+    # in UTC.
+    def instant_at(date, hour = 0, minute = 0, second = 0, microsecond: 0)
+      clock = [hour, minute, second]
+      unless date.is_a?(Predicator::Date) && clock.zip([23, 59, 59]).all? { |part, top| within?(part, top) }
+        raise ArgumentError, "#{date.inspect} at #{clock.inspect} does not name a time of day on a date"
+      end
+
+      seconds = (days_of(date) * SECONDS_PER_DAY) + (hour * 3600) + (minute * 60) + second
+      Predicator::DateTime.new(epoch_seconds: seconds, microsecond:)
+    end
+
+    # The civil {Predicator::Date} of a {Predicator::DateTime}, in UTC.
+    def date_of(instant) = date_of_days(instant.epoch_seconds.div(SECONDS_PER_DAY))
 
     # The days in a month of a year.
     def days_in_month(year, month)

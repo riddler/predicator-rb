@@ -25,7 +25,7 @@ module CastHelper
 
   # The instant at "YYYY-MM-DDTHH:MM:SS" in UTC, for a year of four digits.
   def instant(text)
-    Predicator::DateTime.at(date(*text[0, 10].split("-").map(&:to_i)), *text[11, 8].split(":").map(&:to_i))
+    CIVIL.instant_at(date(*text[0, 10].split("-").map(&:to_i)), *text[11, 8].split(":").map(&:to_i))
   end
 
   def duration(**units) = Predicator::Duration.new(**units)
