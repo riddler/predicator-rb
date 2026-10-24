@@ -65,14 +65,6 @@ module Predicator
       INTEGER_TEXT = /\A-?[0-9]+\z/
       FLOAT_TEXT = /\A-?[0-9]+(?:\.[0-9]+)?\z/
 
-      # The magnitude from which a number rounds to no finite Float: halfway
-      # between the largest Float and 2**1024.
-      FLOAT_CEILING = (2**1024) - (2**970)
-
-      # The magnitude at or below which a number rounds to a zero Float: half
-      # the smallest Float above zero.
-      FLOAT_FLOOR = Rational(1, 2**1075)
-
       # The method that converts to each type.
       CONVERTERS = TYPE_NAMES.to_h { |name| [name, :"cast_to_#{name}"] }.freeze
 
@@ -97,22 +89,15 @@ module Predicator
       def cast_to_float(value)
         case value
         when Float then value
-        when Integer then value.abs < FLOAT_CEILING ? value.to_f : UNDEFINED
+        when Integer then value.abs < FloatText::CEILING ? value.to_f : UNDEFINED
         when String then FLOAT_TEXT.match?(value) ? float_of_text(value) : UNDEFINED
         else UNDEFINED
         end
       end
 
-      # The Float nearest the number the text writes, or undefined when it is
-      # too large for one. The magnitude is judged on the exact number first,
-      # so the host parser is never asked for a Float out of its range.
-      def float_of_text(text)
-        magnitude = Rational(text).abs
-        return UNDEFINED if magnitude >= FLOAT_CEILING
-        return Float(text.start_with?("-") ? "-0" : "0") if magnitude <= FLOAT_FLOOR
-
-        Float(text)
-      end
+      # The Float nearest the number the text writes ({FloatText.read}), or
+      # undefined when it is too large for one.
+      def float_of_text(text) = FloatText.read(text) || UNDEFINED
 
       def cast_to_string(value)
         case value

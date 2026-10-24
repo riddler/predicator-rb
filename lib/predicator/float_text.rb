@@ -16,12 +16,40 @@ module Predicator
   # same length. A negative number carries a minus in front of either form;
   # zero is `0.0` and negative zero `-0.0`.
   #
+  # It also reads a number's decimal text as the Float nearest it ({read}).
+  #
   # The module holds no state. It is private to the package.
   module FloatText
     # The magnitude from which the exponent form is always written.
     EXPONENT_FROM = 2**53
 
+    # The magnitude from which a number rounds to no finite Float: halfway
+    # between the largest Float and 2**1024.
+    CEILING = (2**1024) - (2**970)
+
+    # The magnitude at or below which a number rounds to a zero Float: half
+    # the smallest Float above zero.
+    FLOOR = Rational(1, 2**1075)
+
     module_function
+
+    # The Float nearest the number a decimal text writes (an optional minus,
+    # digits, and an optional point and digits; no exponent), or nil when
+    # the number is too large for a finite Float. A number too close to zero
+    # for any other Float reads as zero, signed as the text is. The
+    # magnitude is judged on the exact number first, so the host's parser is
+    # never asked for a Float outside its range, where it would print a
+    # warning.
+    #
+    # @param text [String]
+    # @return [Float, nil]
+    def read(text)
+      magnitude = Rational(text).abs
+      return if magnitude >= CEILING
+      return Float(text.start_with?("-") ? "-0" : "0") if magnitude <= FLOOR
+
+      Float(text)
+    end
 
     # @param value [Float] a finite Float
     # @return [String]

@@ -43,7 +43,7 @@ class EvaluatorCastsTest < Minitest::Test
     ["", "-", "+1", "1_000", "0x10", "1.0", "١"].each { |text| assert_undefined(text, "integer") }
   end
 
-  # sabotage: drop the FLOAT_CEILING check in Casts#float_of_text; the first
+  # sabotage: drop the CEILING check in FloatText.read; the first
   # text answers Infinity and its assert_undefined fails.
   def test_numbers_too_large_for_a_finite_float_are_undefined_and_too_small_ones_zero
     assert_undefined("17976931348623159#{"0" * 292}", "float")
@@ -53,7 +53,7 @@ class EvaluatorCastsTest < Minitest::Test
     assert_equal 5.0e-321, cast("0.#{"0" * 320}5", "float")
   end
 
-  # sabotage: answer UNDEFINED for "-0" in Casts#float_of_text (when
+  # sabotage: answer nil for "-0" in FloatText.read (when
   # magnitude.zero?); its assert_equal fails.
   def test_float_text_keeps_its_sign_and_reads_leading_zeros_and_nothing_but_a_decimal
     assert_equal "-0.0", cast("-0", "float").to_s

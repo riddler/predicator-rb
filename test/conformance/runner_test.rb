@@ -9,10 +9,9 @@ require_relative "transcript_check"
 # The conformance runner: every case of every tier the vendored manifest
 # lists, on the evaluator surface and, when its source is not null, on the
 # compiler surface, with no skip list. The library is reached only through
-# Conformance::Attempts (the seam the evaluator is plugged into, and a later
-# change plugs the compiler into; until then every compiler attempt answers
-# a fail naming the gap), and the run reports per surface how many cases
-# have no registry entry.
+# Conformance::Attempts (the seam the evaluator and the compiler are
+# plugged into), and the run reports per surface how many cases have no
+# registry entry.
 class RunnerTest < Minitest::Test
   include Conformance::CopyHelper
 

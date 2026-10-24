@@ -22,11 +22,12 @@ module Conformance
   # runs every case under the default option), and compares the answer with
   # expected_result, or the error's type and reason with expected_error. The
   # evaluator is private to the package until the public entry points call
-  # it, so the seam reaches it by name. The compiler is not implemented yet,
-  # so that surface answers a fail naming the gap for every case; the change
-  # that adds it compares its compilation of the case's source with the
-  # case's instructions. ISA_VERSION gives way to the package's own accessor
-  # when the public surface has one.
+  # it, so the seam reaches it by name. The compiler surface compiles the
+  # case's source with Predicator.compile and compares the instruction list
+  # with the case's instructions, operand by operand as identical? judges
+  # them (an Integer is not a Float, a date is not a datetime). ISA_VERSION
+  # gives way to the package's own accessor when the public surface has
+  # one.
   module Attempts
     # The instruction-set version this package claims, which scopes which
     # cases a run attempts (Corpus#runnable). It is the package's version, not
@@ -79,9 +80,19 @@ module Conformance
       actual.keys.sort == expected.keys.sort && expected.all? { |key, value| identical?(actual[key], value) }
     end
 
+    # The compiler surface's attempt of one case.
+    def self.compile(item)
+      result = Predicator.compile(item["source"])
+      expected = item["instructions"]
+      return "refused with #{described(result.error)}: #{result.error.message}" unless result.ok?
+      return :pass if identical?(result.value, expected)
+
+      "compiled to #{result.value.inspect}; expected #{expected.inspect}"
+    end
+
     # The attempt each surface makes of a case.
     ALL = {
-      "compiler" => ->(_item) { "the compiler is not implemented" },
+      "compiler" => ->(item) { compile(item) },
       "evaluator" => ->(item) { evaluate(item) }
     }.freeze
   end

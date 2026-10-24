@@ -4,6 +4,7 @@ require "strscan"
 require_relative "values"
 require_relative "errors"
 require_relative "iso_text"
+require_relative "float_text"
 require_relative "lexer/literals"
 require_relative "lexer/numbers"
 
