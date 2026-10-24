@@ -93,17 +93,38 @@ class CompareTest < Minitest::Test
     assert_compares true, [1, 2], "LT", [1, 3]
     assert_compares true, [1], "LT", [1, 2]
     assert_compares true, [date("2026-01-01"), date("2026-01-02")], "GT", [date("2026-01-01"), date("2025-12-31")]
-    assert_compares UNDEFINED, [1], "LT", ["a"]
   end
 
-  # sabotage: answer 1 for every null member in Order.null_against; null
-  # against "a" orders after it and the assert_compares on it fails.
+  # sabotage: give null rank 0 in Order::SINGLE_RANKS (beside a number);
+  # [nil] > [1] answers undefined and the first assert_compares fails.
   def test_a_null_member_orders_after_a_number_and_false_and_before_the_rest
     assert_compares true, [nil], "GT", [1]
     assert_compares true, [nil], "GT", [false]
     assert_compares true, [nil], "LT", ["a"]
     assert_compares true, [true], "GT", [nil]
     assert_compares true, [nil, 1], "LT", [nil, 2]
+  end
+
+  # sabotage: answer nil for a pair of two kinds in Order.member_order
+  # (`return nil unless` the ranks match); [1] < [false] answers
+  # undefined and the first assert_compares, in the each_cons walk, fails.
+  def test_members_of_two_kinds_order_by_the_references_term_order
+    ascending = [1, false, nil, true, UNDEFINED, { "a" => 1 }, [1], "a"]
+    ascending.each_cons(2) { |lower, higher| assert_compares true, [lower], "LT", [higher] }
+    assert_compares true, [1], "LT", [true]
+    assert_compares true, [true], "LT", ["a"]
+    assert_compares true, [UNDEFINED], "GT", [1]
+    assert_compares true, [[1]], "GT", [1]
+    assert_compares true, [1], "LT", [date("2024-01-15")]
+    assert_compares true, [date("2024-01-15")], "LT", ["a"]
+  end
+
+  # sabotage: drop the level line for two members of one single-valued
+  # kind from Order.member_order; [undefined] <= [undefined] answers
+  # undefined and the first assert_compares fails.
+  def test_two_undefined_members_are_level
+    assert_compares true, [UNDEFINED], "LTE", [UNDEFINED]
+    assert_compares true, [UNDEFINED, 1], "LT", [UNDEFINED, 2]
   end
 
   # sabotage: drop the date_against_datetime? line from
