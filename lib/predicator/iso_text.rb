@@ -46,13 +46,23 @@ module Predicator
     # @param text [String]
     # @return [DateTime, nil] the instant the text names, or nil
     def read_datetime(text)
+      instant = read_instant(text)
+      in_years(instant) if instant
+    end
+
+    # The instant the text names, whatever its year in UTC: a datetime
+    # literal in source reads its text so, as the reference's literal does.
+    #
+    # @param text [String]
+    # @return [DateTime, nil] the instant the text names, or nil
+    def read_instant(text)
       match = DATETIME_TEXT.match(text)
       return unless match
 
       sign, year, month, day, *clock, fraction, zone = match.captures
       local = local_instant(civil_date(sign, year, month, day), clock.map { |part| Integer(part, 10) }, fraction)
       offset = read_offset(zone)
-      in_years(local.with(epoch_seconds: local.epoch_seconds - offset)) if local && offset
+      local.with(epoch_seconds: local.epoch_seconds - offset) if local && offset
     end
 
     def civil_date(sign, *parts)
