@@ -31,7 +31,7 @@ module Predicator
       # left minus right, both dates or datetimes, as a duration.
       def difference(left, right)
         if left.is_a?(Predicator::Date) && right.is_a?(Predicator::Date)
-          return Duration.new(days: left.to_days - right.to_days)
+          return Duration.new(days: Civil.days_of(left) - Civil.days_of(right))
         end
 
         Duration.new(seconds: truncated_seconds(micros(left) - micros(right)))
@@ -41,7 +41,7 @@ module Predicator
       # 1 and back when it is -1.
       def shift(anchor, duration, sign)
         if anchor.is_a?(Predicator::Date)
-          return Predicator::Date.from_days(anchor.to_days + (sign * whole_days(duration)))
+          return Civil.date_of_days(Civil.days_of(anchor) + (sign * whole_days(duration)))
         end
 
         moved = micros(anchor) + (sign * datetime_step(duration))
@@ -70,7 +70,7 @@ module Predicator
 
       # A date at midnight UTC, or a datetime, as microseconds since the epoch.
       def micros(value)
-        return value.to_days * Civil::SECONDS_PER_DAY * MICROS_PER_SECOND if value.is_a?(Predicator::Date)
+        return Civil.days_of(value) * Civil::SECONDS_PER_DAY * MICROS_PER_SECOND if value.is_a?(Predicator::Date)
 
         (value.epoch_seconds * MICROS_PER_SECOND) + value.microsecond
       end

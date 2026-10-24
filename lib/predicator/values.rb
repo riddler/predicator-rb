@@ -7,7 +7,8 @@ module Predicator
   # is a value of its own and never Ruby's nil, which is predicator's null (a
   # value that is present and empty); the two are distinct in the language.
   # There is exactly one instance, {Predicator::UNDEFINED}, compared by
-  # identity.
+  # identity. The class is private to the package; the instance is the
+  # value a host holds.
   class Undefined
     # @return [String] how the one instance prints
     def inspect = "Predicator::UNDEFINED"
@@ -25,6 +26,7 @@ module Predicator
 
   # The one {Undefined} instance.
   UNDEFINED = Undefined.send(:new).freeze
+  private_constant :Undefined
 
   # A civil date: a year, a month and a day on the proleptic Gregorian
   # calendar, with no time of day and no zone. It is an immutable value,
@@ -38,17 +40,6 @@ module Predicator
   # @!attribute [r] day
   #   @return [Integer] the day of the month, 1 to the month's length
   Date = Data.define(:year, :month, :day) do
-    # The date days after 1970-01-01 (negative days count back from it).
-    #
-    # @param days [Integer]
-    # @return [Date]
-    def self.from_days(days)
-      raise ArgumentError, "days must be an Integer, not #{days.inspect}" unless days.is_a?(Integer)
-
-      year, month, day = Civil.civil_from_days(days)
-      new(year:, month:, day:)
-    end
-
     # @param year [Integer]
     # @param month [Integer]
     # @param day [Integer]
@@ -60,11 +51,6 @@ module Predicator
 
       super
     end
-
-    # The count of days from 1970-01-01 to this date, negative before it.
-    #
-    # @return [Integer]
-    def to_days = Civil.days_from_civil(year, month, day)
 
     # The date as ISO 8601 text, `YYYY-MM-DD`, for a year from 0 to 9999.
     # Other years are written with as many digits as they take and a leading
@@ -105,7 +91,7 @@ module Predicator
         raise ArgumentError, "#{date.inspect} at #{clock.inspect} does not name a time of day on a date"
       end
 
-      seconds = (date.to_days * Civil::SECONDS_PER_DAY) + (hour * 3600) + (minute * 60) + second
+      seconds = (Civil.days_of(date) * Civil::SECONDS_PER_DAY) + (hour * 3600) + (minute * 60) + second
       new(epoch_seconds: seconds, microsecond:)
     end
 
@@ -123,7 +109,7 @@ module Predicator
     # The civil date of this instant, in UTC.
     #
     # @return [Date]
-    def to_date = Date.from_days(epoch_seconds.div(Civil::SECONDS_PER_DAY))
+    def to_date = Civil.date_of_days(epoch_seconds.div(Civil::SECONDS_PER_DAY))
 
     # @return [Integer] the hour of the day, 0 to 23, in UTC
     def hour = seconds_of_day / 3600

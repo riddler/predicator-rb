@@ -23,6 +23,14 @@ module Predicator
     #   e.g. `len() expects a string argument`;
     # - a function that raises: `Function NAME() raised: ` and the
     #   exception's inspect.
+    #
+    # A host function is called with a copy of each argument
+    # ({Boundary.copy}), so that nothing it does to a list, a map or a
+    # String it is handed changes the context or a value the evaluation
+    # holds. Its answer is checked against the value domain: one outside it
+    # is refused with an EvaluationError carrying the boundary's reason
+    # (unsupported_host_value, non_finite_number, cyclic_value or
+    # depth_limit_exceeded), and nothing is pushed.
     module Calls
       # How a library function refuses its arguments: the message is the
       # refusal's reason. Raised and rescued inside a call; it never leaves
@@ -79,12 +87,20 @@ module Predicator
         callable, counts = resolve(name)
         return call_error("Unknown function: #{name}") unless callable
         return call_error(wrong_count(name, counts, args.size)) unless counts.include?(args.size)
+        return host_call(name, callable, args) if @functions.key?(name)
 
         Answered.new(callable.call(*args))
       rescue Refusal => e
         call_error(e.message)
       rescue StandardError => e
         call_error("Function #{name}() raised: #{e.inspect}")
+      end
+
+      # Calls a host function with a copy of each argument, answering its
+      # answer, or the refusal of one outside the value domain ({Boundary}).
+      def host_call(name, callable, args)
+        answer = callable.call(*args.map { |arg| Boundary.copy(arg) })
+        Boundary.refusal(answer, "Function #{name}() answered a value that") || Answered.new(answer)
       end
 
       # The callable a name reaches and the counts of arguments it takes: a

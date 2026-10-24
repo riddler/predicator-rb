@@ -87,7 +87,7 @@ class EvaluatorDurationsTest < Minitest::Test
     clock = -> { NOON }
     three_days = 3 * 86_400
     { "ago" => -three_days, "last" => -three_days, "future" => three_days, "next" => three_days }.each do |way, by|
-      moved = answer([["duration", [[3, "d"]]], ["relative_date", way]], now: clock)
+      moved = answer([["duration", [[3, "d"]]], ["relative_date", way]], clock:)
       assert_equal instant(NOON.epoch_seconds + by, 250_000), moved, way
     end
   end
@@ -98,9 +98,9 @@ class EvaluatorDurationsTest < Minitest::Test
   def test_relative_date_keeps_milliseconds_as_add_and_subtract_do
     clock = -> { NOON }
     assert_equal instant(NOON.epoch_seconds + 1, 750_000),
-                 answer([["duration", [[1, "s"], [500, "ms"]]], %w[relative_date future]], now: clock)
+                 answer([["duration", [[1, "s"], [500, "ms"]]], %w[relative_date future]], clock:)
     assert_equal instant(NOON.epoch_seconds - 3600, 250_000),
-                 answer([["duration", [[1, "h"], [-5, "ms"]]], %w[relative_date ago]], now: clock)
+                 answer([["duration", [[1, "h"], [-5, "ms"]]], %w[relative_date ago]], clock:)
   end
 
   # sabotage: drop `return @now if @now` from RichTypes#now; the clock is read
@@ -108,11 +108,11 @@ class EvaluatorDurationsTest < Minitest::Test
   def test_the_clock_is_read_once_per_evaluation_and_only_when_asked
     clock, reads = counting_clock
     both = answer([["duration", [[1, "d"]]], %w[relative_date ago], ["duration", [[1, "d"]]],
-                   %w[relative_date next], %w[compare LT]], now: clock)
+                   %w[relative_date next], %w[compare LT]], clock:)
 
     assert(both)
     assert_equal [:read], reads
-    answer([["lit", 1]], now: clock)
+    answer([["lit", 1]], clock:)
     assert_equal [:read], reads
   end
 
@@ -131,9 +131,9 @@ class EvaluatorDurationsTest < Minitest::Test
   # sabotage: drop the respond_to?(:call) check from Evaluator.evaluate;
   # NOON is accepted as the clock and the first assert_raises fails.
   def test_a_clock_of_the_wrong_kind_is_a_callers_bug
-    assert_raises(ArgumentError) { run_list([["lit", 1]], now: NOON) }
+    assert_raises(ArgumentError) { run_list([["lit", 1]], clock: NOON) }
     error = assert_raises(ArgumentError) do
-      run_list([["duration", [[1, "d"]]], %w[relative_date ago]], now: -> { Time.at(0) })
+      run_list([["duration", [[1, "d"]]], %w[relative_date ago]], clock: -> { Time.at(0) })
     end
     assert_match(/not a Predicator::DateTime/, error.message)
   end

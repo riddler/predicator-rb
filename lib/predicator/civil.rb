@@ -5,13 +5,14 @@ module Predicator
   # that the package needs no date library: a civil date (year, month, day) to
   # a count of days since 1970-01-01 and back, and the tests built on them.
   #
-  # Every function takes and answers Integers. The algorithms are the
-  # era-based ones published by Howard Hinnant ("chrono-Compatible Low-Level
-  # Date Algorithms"), exact for every Integer year, so a year before 1 or
-  # after 9999 converts as well as any other.
+  # Every function but the two that convert a {Predicator::Date} takes and
+  # answers Integers. The algorithms are the era-based ones published by
+  # Howard Hinnant ("chrono-Compatible Low-Level Date Algorithms"), exact for
+  # every Integer year, so a year before 1 or after 9999 converts as well as
+  # any other.
   #
   # The module holds no state. It is private to the package: the value classes
-  # in values.rb and the codec in tagged.rb are its callers.
+  # in values.rb, the evaluator and the codec in tagged.rb are its callers.
   module Civil
     # Seconds in a civil day; an instant's day is its epoch second divided by
     # this, rounded toward the past.
@@ -74,6 +75,13 @@ module Predicator
 
       day.between?(1, days_in_month(year, month))
     end
+
+    # The {Predicator::Date} days after 1970-01-01.
+    def date_of_days(days) = Predicator::Date.new(*civil_from_days(days))
+
+    # The count of days from 1970-01-01 to a {Predicator::Date}, negative
+    # before it.
+    def days_of(date) = days_from_civil(date.year, date.month, date.day)
 
     # The days in a month of a year.
     def days_in_month(year, month)

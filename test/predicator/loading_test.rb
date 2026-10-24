@@ -17,12 +17,13 @@ class LoadingTest < Minitest::Test
 
   # What the main entry point loads.
   MAIN = (["predicator.rb"] +
-          %w[ast civil duration_text emitter emitter/chains emitter/statements errors evaluator evaluator/access
-             evaluator/arithmetic evaluator/calls evaluator/casts evaluator/chronology evaluator/compare
-             evaluator/json_functions evaluator/json_scan evaluator/library evaluator/math_functions evaluator/order
-             evaluator/rich_types evaluator/statements float_text iso_text lexer lexer/literals lexer/numbers parser
-             parser/durations parser/operators parser/postfix parser/primaries parser/statements parser/token_text
-             result values version].map { |f| "predicator/#{f}.rb" }).freeze
+          %w[ast boundary civil duration_text emitter emitter/chains emitter/statements errors evaluator
+             evaluator/access evaluator/arithmetic evaluator/calls evaluator/casts evaluator/chronology
+             evaluator/compare evaluator/json_functions evaluator/json_scan evaluator/library
+             evaluator/math_functions evaluator/order evaluator/rich_types evaluator/statements float_text
+             iso_text lexer lexer/literals lexer/numbers parser parser/durations parser/operators parser/postfix
+             parser/primaries parser/statements parser/token_text result values
+             version].map { |f| "predicator/#{f}.rb" }).freeze
 
   def loaded_by(path)
     output, status = Open3.capture2(RbConfig.ruby, "-I", LIB, "-e", %(require "#{path}"\n#{PROBE}))
