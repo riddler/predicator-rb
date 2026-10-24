@@ -4,6 +4,8 @@ require_relative "values"
 require_relative "errors"
 require_relative "result"
 require_relative "float_text"
+require_relative "duration_text"
+require_relative "iso_text"
 require_relative "evaluator/chronology"
 require_relative "evaluator/arithmetic"
 require_relative "evaluator/access"
@@ -11,6 +13,7 @@ require_relative "evaluator/rich_types"
 require_relative "evaluator/library"
 require_relative "evaluator/calls"
 require_relative "evaluator/statements"
+require_relative "evaluator/casts"
 
 module Predicator
   # The stack machine that runs an instruction list against a context. It
@@ -76,7 +79,8 @@ module Predicator
       list: ->(operand) { operand.is_a?(Array) },
       comparison_operator: ->(operand) { Compare::OPERATORS.include?(operand) },
       positive_integer: ->(operand) { operand.is_a?(Integer) && operand.positive? },
-      count: ->(operand) { operand.is_a?(Integer) && !operand.negative? }
+      count: ->(operand) { operand.is_a?(Integer) && !operand.negative? },
+      type_name: ->(operand) { Casts::TYPE_NAMES.include?(operand) }
     }.freeze
 
     # The instructions this build knows, by opcode. `and` and `or` were
@@ -113,6 +117,7 @@ module Predicator
       "jump" => Row.new(operands: [:positive_integer], removed_in: nil, handler: :jump),
       "pop_jump_if_falsy" => Row.new(operands: [:positive_integer], removed_in: nil, handler: :pop_jump_if_falsy),
       "jump_backward" => Row.new(operands: [:positive_integer], removed_in: nil, handler: :jump_backward),
+      "cast" => Row.new(operands: [:type_name], removed_in: nil, handler: :cast),
       "and" => Row.new(operands: [], removed_in: 3, handler: nil),
       "or" => Row.new(operands: [], removed_in: 3, handler: nil)
     }.freeze
@@ -246,8 +251,9 @@ module Predicator
     # membership and list construction in {Access}, those of durations,
     # relative dates and maps in {RichTypes}, that of `call` in {Calls},
     # which includes the library {Library} defines, and those of the
-    # statement and jump opcodes in {Statements}; Machine includes all five,
-    # and the refusals they share in {Refusals}.
+    # statement and jump opcodes in {Statements}, and that of `cast` in
+    # {Casts}; Machine includes all six, and the refusals they share in
+    # {Refusals}.
     class Machine
       include Refusals
       include Arithmetic
@@ -255,6 +261,7 @@ module Predicator
       include RichTypes
       include Calls
       include Statements
+      include Casts
 
       def initialize(program, context, settings)
         @program = program
