@@ -102,7 +102,7 @@ class EvaluatorTest < Minitest::Test
     assert_answers 1, [%w[load x]], { "x" => 1 }, on_unbound: :error
   end
 
-  # sabotage: make the UNBOUND_POLICIES check in Evaluator.evaluate
+  # sabotage: make the UNBOUND_POLICIES check in Evaluator.settings
   # `unless true`; the run answers and the first assert_raises fails.
   def test_arguments_of_the_wrong_kind_are_refused_as_a_callers_bug
     assert_raises(ArgumentError) { run_list([["lit", 1]], {}, on_unbound: :ignore) }

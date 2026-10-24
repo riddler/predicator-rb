@@ -1,6 +1,6 @@
 {
 "claims": [
-{"surface":"evaluator","tier":5}
+{"surface":"evaluator","tier":6}
 ],
 "corpus_hash": "sha256:ddc5cf824b06b4899e1bd4166263a1ee07016ff239216e029b9276ac17243975",
 "entries": [
@@ -174,8 +174,38 @@
 {"case_id":"functions/trim","surface":"evaluator","tier":5},
 {"case_id":"functions/unknown-function","surface":"evaluator","tier":5},
 {"case_id":"functions/upper","surface":"evaluator","tier":5},
+{"case_id":"statements/pop-discards-top","surface":"evaluator","tier":6},
+{"case_id":"statements/pop-empty-stack","surface":"evaluator","tier":6},
+{"case_id":"statements/store-index-vivifies-list","surface":"evaluator","tier":6},
+{"case_id":"statements/store-insufficient-operands","surface":"evaluator","tier":6},
+{"case_id":"statements/store-nested-vivifies-map","surface":"evaluator","tier":6},
+{"case_id":"statements/store-non-scalar-segment","surface":"evaluator","tier":6},
+{"case_id":"statements/store-not-a-container","surface":"evaluator","tier":6},
+{"case_id":"statements/store-overwrites","surface":"evaluator","tier":6},
+{"case_id":"statements/store-root","surface":"evaluator","tier":6},
+{"case_id":"control_flow/else-branch-runs","surface":"evaluator","tier":8},
+{"case_id":"control_flow/else-if-chain-final-else","surface":"evaluator","tier":8},
+{"case_id":"control_flow/else-if-chain-first-branch","surface":"evaluator","tier":8},
+{"case_id":"control_flow/else-if-chain-second-branch","surface":"evaluator","tier":8},
+{"case_id":"control_flow/if-else-empty-else-block-condition-false","surface":"evaluator","tier":8},
+{"case_id":"control_flow/if-else-empty-else-block-condition-true","surface":"evaluator","tier":8},
+{"case_id":"control_flow/if-else-non-boolean-condition-with-jump","surface":"evaluator","tier":8},
+{"case_id":"control_flow/if-empty-then-block-condition-false","surface":"evaluator","tier":8},
+{"case_id":"control_flow/if-empty-then-block-condition-true","surface":"evaluator","tier":8},
+{"case_id":"control_flow/jump-skips-else","surface":"evaluator","tier":8},
+{"case_id":"control_flow/nested-if-outer-else-skips-nested","surface":"evaluator","tier":8},
+{"case_id":"control_flow/nested-if-then-branch-inner-else","surface":"evaluator","tier":8},
+{"case_id":"control_flow/nested-if-then-branch-inner-if","surface":"evaluator","tier":8},
+{"case_id":"control_flow/pop-jump-if-falsy-falls-through","surface":"evaluator","tier":8},
+{"case_id":"control_flow/pop-jump-if-falsy-non-boolean","surface":"evaluator","tier":8},
+{"case_id":"control_flow/pop-jump-if-falsy-taken","surface":"evaluator","tier":8},
+{"case_id":"control_flow/pop-jump-if-falsy-undefined-is-falsy","surface":"evaluator","tier":8},
+{"case_id":"loops/budget-exhausted-on-infinite-loop","surface":"evaluator","tier":9},
+{"case_id":"loops/counted-loop-runs-to-completion","surface":"evaluator","tier":9},
+{"case_id":"loops/jump-backward-is-unconditional","surface":"evaluator","tier":9},
 {"case_id":"loops/jump-backward-past-start-is-unknown-instruction","surface":"evaluator","tier":9},
-{"case_id":"loops/jump-backward-zero-offset-is-unknown-instruction","surface":"evaluator","tier":9}
+{"case_id":"loops/jump-backward-zero-offset-is-unknown-instruction","surface":"evaluator","tier":9},
+{"case_id":"loops/zero-iterations-when-condition-starts-falsy","surface":"evaluator","tier":9}
 ],
 "implementation": "predicator-rb",
 "isa_version": 6

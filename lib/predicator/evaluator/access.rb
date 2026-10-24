@@ -19,6 +19,10 @@ module Predicator
       # Integer: the reference admits its atoms, which are these.
       ATOM_KEYS = [true, false, nil, UNDEFINED].freeze
 
+      # The plain map a duration is: each of its eight unit names to that
+      # unit.
+      def self.units(duration) = DURATION_UNITS.to_h { |name| [name, duration.public_send(name)] }
+
       private
 
       # Reads the named member off the popped target. A miss, and a target

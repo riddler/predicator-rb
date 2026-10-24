@@ -98,13 +98,21 @@ class EvaluatorJsonTest < Minitest::Test
   def test_parse_reads_json_values_and_refuses_a_number_too_large
     assert_equal({ "a" => [1, -0.25, 100.0, "é/", nil, false], "b" => {} },
                  read(' {"a" : [1, -2.5e-1, 1E2, "\\u00e9\\/", null, false], "b":{}} '))
-    assert_equal({ "a" => 2 }, read('{"a":1,"a":2}'))
     assert_equal [12, -500.0], [read("12"), read("-0.5e+3 ")]
     assert_equal "Invalid JSON: unexpected sequence at position 1", refused("JSON.parse", "[1e400]")
     assert_equal [0.0], read("[1e-400]")
     pairs = "[\"\\ud800\\udc00\", \"\\uDBFF\\uDFFF\", \"\u{1F600}\"]"
     assert_equal ["\u{10000}", "\u{10FFFF}", "\u{1F600}"], read(pairs)
     assert_equal "JSON.parse expects a string argument", refused("JSON.parse", 1)
+  end
+
+  # sabotage: drop `unless members.key?(key)` from JsonRead#map; the last
+  # value is kept and the first assert_equal fails.
+  def test_parse_keeps_the_first_value_of_a_repeated_key_as_the_reference_does
+    assert_equal({ "a" => 1 }, read('{"a":1,"a":2}'))
+    assert_equal({ "a" => { "x" => 1 } }, read('{"a":{"x":1},"a":[2]}'))
+    assert_equal({ "o" => { "b" => 1 }, "l" => [{ "c" => nil }] },
+                 read(%( { "o" : {"b":1, "b":null} , "l":[ {"c":null,"c":2} ] } )))
   end
 
   # sabotage: read `@bytes = text.encode(Encoding::UTF_8)` in
