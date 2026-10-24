@@ -10,11 +10,15 @@ require_relative "evaluator/access"
 require_relative "evaluator/rich_types"
 require_relative "evaluator/library"
 require_relative "evaluator/calls"
+require_relative "evaluator/statements"
 
 module Predicator
-  # The stack machine that runs an instruction list against a context, in
-  # expression mode: the answer is the top of the stack at halt. It is
-  # private to the package until the public entry points call it.
+  # The stack machine that runs an instruction list against a context. It
+  # runs in one of two modes, carried by the entry point and not by the
+  # list: in expression mode ({evaluate}) the answer is the top of the stack
+  # at halt; in statement mode ({execute}) it is the context at halt. The
+  # instructions mean the same in both. It is private to the package until
+  # the public entry points call it.
   #
   # A program is a flat list of instructions run in order from index 0; it
   # halts when the instruction pointer reaches or passes the end, so a jump
@@ -34,7 +38,8 @@ module Predicator
   # most once per evaluation, so every such instruction in one evaluation
   # reads the same instant. It includes the host's functions too: `call`
   # reaches the ones the caller passed to this evaluation, then the
-  # package's own library, and nothing registered anywhere else.
+  # package's own library, and nothing registered anywhere else. And it
+  # includes the loop budget: the back edges one evaluation may take.
   module Evaluator
     # The instruction-set version this build runs: an opcode retired at or
     # below it is refused.
@@ -44,6 +49,10 @@ module Predicator
     # pushes undefined (and the answer is an unbound-variable error if
     # undefined is what the program answers); :error stops at the load.
     UNBOUND_POLICIES = %i[undefined error].freeze
+
+    # The back edges (`jump_backward`) one evaluation may take when the
+    # caller names no budget, the reference's default.
+    DEFAULT_LOOP_BUDGET = 10_000
 
     # The clock an evaluation reads when the caller passes none: the system's
     # real-time clock, read to the microsecond, as an instant in UTC. It
@@ -99,47 +108,103 @@ module Predicator
       "object_new" => Row.new(operands: [], removed_in: nil, handler: :object_new),
       "object_set" => Row.new(operands: [:string], removed_in: nil, handler: :object_set),
       "call" => Row.new(operands: %i[string count], removed_in: nil, handler: :call_function),
+      "store" => Row.new(operands: [:count], removed_in: nil, handler: :store),
+      "pop" => Row.new(operands: [], removed_in: nil, handler: :discard),
+      "jump" => Row.new(operands: [:positive_integer], removed_in: nil, handler: :jump),
+      "pop_jump_if_falsy" => Row.new(operands: [:positive_integer], removed_in: nil, handler: :pop_jump_if_falsy),
+      "jump_backward" => Row.new(operands: [:positive_integer], removed_in: nil, handler: :jump_backward),
       "and" => Row.new(operands: [], removed_in: 3, handler: nil),
       "or" => Row.new(operands: [], removed_in: 3, handler: nil)
     }.freeze
 
-    # Runs instructions against context in expression mode.
+    # The options one evaluation runs under, checked: the unbound policy,
+    # the clock, the host's functions and the loop budget.
+    Settings = Data.define(:on_unbound, :clock, :functions, :loop_budget)
+    private_constant :Settings
+
+    # What a run in statement mode answers: the context at halt and the
+    # value the last `pop` discarded (undefined when no `pop` ran), or the
+    # error that stopped the run and the context as it stood then, which
+    # holds every write made before the failing instruction.
+    #
+    # @!attribute [r] error
+    #   @return [Object, nil] the error value that stopped the run, or nil
+    # @!attribute [r] context
+    #   @return [Hash] the context at halt, or when the run stopped
+    # @!attribute [r] value
+    #   @return [Object] what the last `pop` discarded, or undefined
+    StatementResult = Data.define(:error, :context, :value) do
+      # Whether the run reached its halt.
+      def ok? = error.nil?
+    end
+
+    # Runs instructions against context in expression mode: the answer is
+    # the top of the stack at halt.
     #
     # @param instructions [Array] the instruction list
     # @param context [Hash{String => Object}] the variables a load reads
-    # @param on_unbound [Symbol] one of {UNBOUND_POLICIES}
-    # @param now [#call, nil] the clock: called with no argument, it answers
-    #   the current time as a {Predicator::DateTime}. It is called at most
-    #   once, and only when an instruction reads the time. nil means
-    #   {SYSTEM_CLOCK}.
-    # @param functions [Hash{String => #call}] the host's functions for this
-    #   evaluation, by the name a `call` instruction names. Each is called
-    #   with the call's arguments, first argument first, and answers the
-    #   call's value; the counts of arguments it accepts are the ones its
+    # @param options [Hash] the evaluation's options, each optional:
+    # @option options [Symbol] :on_unbound one of {UNBOUND_POLICIES};
+    #   :undefined when not given
+    # @option options [#call, nil] :now the clock: called with no argument,
+    #   it answers the current time as a {Predicator::DateTime}. It is called
+    #   at most once, and only when an instruction reads the time. nil, the
+    #   default, means {SYSTEM_CLOCK}.
+    # @option options [Hash{String => #call}] :functions the host's functions
+    #   for this evaluation, by the name a `call` instruction names. Each is
+    #   called with the call's arguments, first argument first, and answers
+    #   the call's value; the counts of arguments it accepts are the ones its
     #   parameters take. A name here shadows the library function of the
     #   same name, for this evaluation only. {Calls} says how a call is
     #   refused.
+    # @option options [Integer] :loop_budget the back edges the evaluation
+    #   may take, at least 0; {DEFAULT_LOOP_BUDGET} when not given. A
+    #   `jump_backward` that finds the budget spent stops the run with
+    #   loop_budget_exceeded.
     # @return [Result] the top of the stack at halt, or the error that
     #   stopped the run
-    # @raise [ArgumentError] when an argument is not of its kind, or the
-    #   clock answers something other than a {Predicator::DateTime} (a
-    #   caller's bug, not an outcome of the program)
-    def self.evaluate(instructions, context = {}, on_unbound: :undefined, now: nil, functions: {})
+    # @raise [ArgumentError] when an argument is not of its kind, an option
+    #   is unknown, or the clock answers something other than a
+    #   {Predicator::DateTime} (a caller's bug, not an outcome of the
+    #   program)
+    def self.evaluate(instructions, context = {}, **options) = machine(instructions, context, options).run
+
+    # Runs instructions against context in statement mode: the answer is
+    # the context at halt. An empty stack at halt is a normal halt, and
+    # whatever the stack holds then is discarded. The context passed is
+    # never changed; a `store` writes a new one.
+    #
+    # @param instructions [Array] the instruction list
+    # @param context [Hash{String => Object}] the variables a load reads
+    # @param options [Hash] the options {evaluate} takes
+    # @return [StatementResult] the context at halt and the value the last `pop`
+    #   discarded, or the error that stopped the run
+    # @raise [ArgumentError] as {evaluate} raises it
+    def self.execute(instructions, context = {}, **options)
+      machine(instructions, context, options).run_statements
+    end
+
+    def self.machine(instructions, context, options)
       raise ArgumentError, "instructions must be an Array, not #{instructions.inspect}" unless instructions.is_a?(Array)
       raise ArgumentError, "context must be a Hash, not #{context.inspect}" unless context.is_a?(Hash)
 
-      check_options(on_unbound, now)
-      check_functions(functions)
-      Machine.new(instructions, context, on_unbound, now || SYSTEM_CLOCK, functions).run
+      Machine.new(instructions, context, settings(**options))
     end
+    private_class_method :machine
 
-    def self.check_options(on_unbound, now)
+    def self.settings(on_unbound: :undefined, now: nil, functions: {}, loop_budget: DEFAULT_LOOP_BUDGET)
       unless UNBOUND_POLICIES.include?(on_unbound)
         raise ArgumentError, "on_unbound must be one of #{UNBOUND_POLICIES.inspect}, not #{on_unbound.inspect}"
       end
       raise ArgumentError, "now must respond to call, not #{now.inspect}" unless now.nil? || now.respond_to?(:call)
+      unless loop_budget.is_a?(Integer) && !loop_budget.negative?
+        raise ArgumentError, "loop_budget must be an Integer of at least 0, not #{loop_budget.inspect}"
+      end
+
+      check_functions(functions)
+      Settings.new(on_unbound:, clock: now || SYSTEM_CLOCK, functions:, loop_budget:)
     end
-    private_class_method :check_options
+    private_class_method :settings
 
     def self.check_functions(functions)
       raise ArgumentError, "functions must be a Hash, not #{functions.inspect}" unless functions.is_a?(Hash)
@@ -172,43 +237,61 @@ module Predicator
     end
     private_constant :Refusals
 
-    # One evaluation: the program, the context, the policy, the clock, the
-    # host's functions, the stack and the first root a load did not find
-    # bound. Each handler answers the index of the next instruction, or the
-    # error value that stops the run. The handlers of the arithmetic opcodes are in {Arithmetic}, those of
-    # access, membership and list construction in {Access}, those of
-    # durations, relative dates and maps in {RichTypes}, and that of `call`
-    # in {Calls}, which includes the library {Library} defines; Machine
-    # includes all four, and the refusals they share in {Refusals}.
+    # One evaluation: the program, the context (which a `store` replaces),
+    # the policy, the clock, the host's functions, the loop budget left, the
+    # stack, the first root a load did not find bound and the value the last
+    # `pop` discarded. Each handler answers the index of the next
+    # instruction, or the error value that stops the run. The handlers of
+    # the arithmetic opcodes are in {Arithmetic}, those of access,
+    # membership and list construction in {Access}, those of durations,
+    # relative dates and maps in {RichTypes}, that of `call` in {Calls},
+    # which includes the library {Library} defines, and those of the
+    # statement and jump opcodes in {Statements}; Machine includes all five,
+    # and the refusals they share in {Refusals}.
     class Machine
       include Refusals
       include Arithmetic
       include Access
       include RichTypes
       include Calls
+      include Statements
 
-      def initialize(program, context, on_unbound, clock, functions)
+      def initialize(program, context, settings)
         @program = program
         @context = context
-        @on_unbound = on_unbound
-        @clock = clock
-        @functions = functions
+        @on_unbound = settings.on_unbound
+        @clock = settings.clock
+        @functions = settings.functions
+        @budget = settings.loop_budget
         @stack = []
         @unbound = nil
+        @last_value = UNDEFINED
       end
 
-      def run
-        at = 0
-        while at < @program.size
-          step = step(@program[at], at)
-          return Result.failure(step) unless step.is_a?(Integer)
+      # Runs in expression mode: the answer is the top of the stack at halt.
+      def run = drive&.then { |error| Result.failure(error) } || halt
 
-          at = step
-        end
-        halt
+      # Runs in statement mode: the answer is the context at halt. Neither
+      # halt rule of expression mode applies, as there is no stack value to
+      # answer.
+      def run_statements
+        StatementResult.new(error: drive, context: @context, value: @last_value)
       end
 
       private
+
+      # Runs the program until it halts, answering the error that stopped it,
+      # or nil when it halted.
+      def drive
+        at = 0
+        while at < @program.size
+          step = step(@program[at], at)
+          return step unless step.is_a?(Integer)
+
+          at = step
+        end
+        nil
+      end
 
       # The answer at halt. An empty stack is an error; undefined on top is
       # an unbound-variable error naming the first root a load did not find,

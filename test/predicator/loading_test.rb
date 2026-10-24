@@ -25,7 +25,7 @@ class LoadingTest < Minitest::Test
     main = ["predicator.rb"] + %w[civil errors evaluator evaluator/access evaluator/arithmetic
                                   evaluator/calls evaluator/chronology evaluator/compare evaluator/json_functions
                                   evaluator/json_scan evaluator/library evaluator/math_functions evaluator/order
-                                  evaluator/rich_types
+                                  evaluator/rich_types evaluator/statements
                                   float_text result values version]
            .map { |f| "predicator/#{f}.rb" }
 

@@ -110,7 +110,7 @@ module Predicator
 
         value = @stack.pop
         target = @stack.pop
-        target = Access::DURATION_UNITS.to_h { |name| [name, target.public_send(name)] } if target.is_a?(Duration)
+        target = Access.units(target) if target.is_a?(Duration)
         return invalid_stack_value("object_set", "a map beneath the value") unless target.is_a?(Hash)
 
         push(at, target.merge(key => value))

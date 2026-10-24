@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "strscan"
 require_relative "json_scan"
 
 module Predicator
@@ -20,7 +21,8 @@ module Predicator
     # falls back to its own inspect, so the function does not fail on one.
     #
     # `JSON.parse` reads a JSON text into lists, maps with String keys and
-    # scalars; a duplicated key keeps its last value. A text that is not JSON
+    # scalars; a key an object repeats keeps its first value, as the
+    # reference reads one ({JsonRead}). A text that is not JSON
     # is refused with the reference's sentence naming the first fault and its
     # offset in bytes ({JsonScan}): `Invalid JSON: unexpected byte 0x6F at
     # position 1`, or `Invalid JSON: unexpected end of input at position 4`.
@@ -70,7 +72,7 @@ module Predicator
         case value
         when Undefined then string("undefined")
         when Predicator::Date, Predicator::DateTime then string(value.to_s)
-        when Duration then map(Access::DURATION_UNITS.to_h { |unit| [unit, value.public_send(unit)] }, depth)
+        when Duration then map(Access.units(value), depth)
         else raise NoForm
         end
       end
@@ -97,13 +99,69 @@ module Predicator
         fault = JsonScan.fault(text, DEPTH_LIMIT)
         raise Calls::Refusal, fault if fault
 
-        JSON.parse(text, max_nesting: false, allow_duplicate_key: true)
+        JsonRead.new(text).value
       rescue JSON::ParserError
         # The scan accepts only what the reference reads, so Ruby's parser
-        # does not refuse it; if it ever does, its own text stays here.
+        # does not refuse a scalar of it; if it ever does, its own text stays
+        # here.
         raise Calls::Refusal, "Invalid JSON: the text could not be read"
       end
     end
     private_constant :JsonFunctions
+
+    # Reads a JSON text {JsonScan} has accepted, its bytes read as UTF-8,
+    # into lists, maps and scalars. Each scalar's own text is read by Ruby's
+    # json library; the lists and maps are built here, because that library
+    # keeps the last value of a key an object repeats and the reference
+    # keeps the first. The scan has bounded the nesting, so the reader
+    # recurses.
+    class JsonRead
+      # The bytes a JSON text may hold between tokens.
+      SPACE = /[ \t\n\r]*/
+      # A scalar's text: a string, a number or a literal.
+      SCALAR = /"(?:[^"\\]|\\.)*"|-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?|true|false|null/n
+
+      def initialize(text)
+        @scanner = StringScanner.new(text.b)
+      end
+
+      # The value at the scan, and past it.
+      def value
+        @scanner.skip(SPACE)
+        if @scanner.skip("[") then list
+        elsif @scanner.skip("{") then map
+        else JSON.parse(@scanner.scan(SCALAR).force_encoding(Encoding::UTF_8))
+        end
+      end
+
+      private
+
+      def list
+        items = []
+        items << value until closed?("]")
+        items
+      end
+
+      def map
+        members = {}
+        until closed?("}")
+          key = value
+          @scanner.skip(SPACE)
+          @scanner.skip(":")
+          member = value
+          members[key] = member unless members.key?(key)
+        end
+        members
+      end
+
+      # Whether the container closes here, past a comma between members.
+      def closed?(closer)
+        @scanner.skip(SPACE)
+        @scanner.skip(",")
+        @scanner.skip(SPACE)
+        !@scanner.skip(closer).nil?
+      end
+    end
+    private_constant :JsonRead
   end
 end
