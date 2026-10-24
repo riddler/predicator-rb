@@ -51,7 +51,7 @@ should do the work, stop before the irreversible step, and report.
 | `bd close <id>` | never for a mirrored bead whose other half is not merged to its own repo's `origin/main`; a mirrored bead whose other half has ALSO landed may be closed by the campaign conductor under a consent naming this exception, both halves together, each verified against its remote; otherwise the operator's call | for a bead whose description carries a `mirrors:` line while its other half is unlanded, campaign consent included |
 | `bd dolt push` | bead state changed locally **and** the git side of the same change has already reached `origin`; inside a campaign, the conductor pushes (atomically across the campaign's trackers) | as a way to publish beads for work that is not on `origin/main` yet |
 | a release prep (a version bump and a changelog promotion) and its tag | a release bead a campaign consent the operator adopted names (in the campaign plan or their own words); the tag once that prep is merged to `origin/main`, naming its version at the merged commit | on any other bead or on `main`; the tag before the prep is on `origin/main` |
-| a release, `gem push` | never - an agent or a session never runs `gem push`; the release workflow (`.github/workflows/release.yml`) publishes by rubygems trusted publishing on the tag push the release-prep row above already allows | always - a failed workflow is re-run from its Actions page, never worked round by a local publish |
+| a release, `gem push` | never - an agent or a session never runs `gem push`; the release workflow (`.github/workflows/release.yml`, which a later change adds) publishes by rubygems trusted publishing on the tag push the release-prep row above already allows | always - a failed workflow is re-run from its Actions page, never worked round by a local publish |
 
 The organizing principle: the human gate belongs where an action stops being
 reversible. A commit on a per-bead branch is undone with
@@ -96,11 +96,11 @@ a later change adds) publishes on that tag push, and a failed workflow is
 re-run from its Actions page, never worked round by a local publish. Merging
 the prep follows this file's merge row, and nothing else this file reserves
 for the operator changes. A prep is cut only on a green full gate, which
-includes the conformance corpus check.
+includes the conformance corpus check once the corpus is vendored.
 
-The workflow publishes by rubygems trusted publishing: its publish job
-exchanges the job's OIDC token with rubygems.org through
-`rubygems/release-gem`. No rubygems API key exists for this repository and
+The release workflow, once a later change adds it, publishes by rubygems
+trusted publishing: its publish job exchanges the job's OIDC token with
+rubygems.org through `rubygems/release-gem`. No rubygems API key exists for this repository and
 none is created, and this repository holds no secret of any kind; no agent or
 session lists, reads or sets one. Registering the workflow as a trusted
 publisher of the existing gem `predicator` on rubygems.org (repository owner
@@ -144,12 +144,12 @@ against its conformance corpus. It is the rubygems gem `predicator`
 (`require "predicator"`, module `Predicator`), 2.0.0 and later, with zero
 runtime dependencies, on Ruby 3.3 or later.
 
-The tree on `main` today still holds the 2019 gem: the 1.x `lib/`, `test/`,
-gemspec, `Rakefile`, `.travis.yml` and the files beside them are the old 1.x
-implementation being replaced, and the next change deletes them. The
-scaffold of the 2.0.0 package, its gate, CI and the vendored corpus arrive
-with later changes; until they do, the sentences in this file about the
-2.0.0 package, its corpus and its gate describe the target, not the current
+The tree on `main` today is the scaffold of the 2.0.0 package: an empty
+`Predicator` module, the gemspec, the `Rakefile` and the gate (rubocop, then
+the tests under SimpleCov). The 2019 gem is deleted; its 1.x source lives in
+the riddler/predicator repository under `impl/rb`. CI, the release workflow
+and the vendored corpus arrive with later changes; until they do, the
+sentences in this file about them describe the target, not the current
 tree.
 
 - **The gem is `predicator`.** Version 2.0.0 is a breaking major on the same
@@ -172,10 +172,8 @@ are rewritten for 2.0.0 by later changes.
 
 ## Build & Test
 
-Once the scaffold lands:
-
 ```bash
-mise install                          # the Ruby that mise.toml will pin
+mise install                          # the Ruby that mise.toml pins
 mise exec -- bundle install           # the dev tools
 mise exec -- bundle exec rake test    # inner loop
 mise exec -- bundle exec rake         # full gate
@@ -183,7 +181,7 @@ mise exec -- bundle exec rake         # full gate
 
 ### This repo's own gate rules
 
-- The full gate will be `mise exec -- bundle exec rake`, the `Rakefile`'s
+- The full gate is `mise exec -- bundle exec rake`, the `Rakefile`'s
   default task: rubocop, the corpus check once the corpus is vendored, and
   the tests under SimpleCov at a 90 percent minimum. The inner loop is
   `mise exec -- bundle exec rake test`. Only the full command is the
@@ -215,9 +213,9 @@ mise exec -- bundle exec rake         # full gate
 
 ## Conventions
 
-This repository is not part of the statifier package family, but it is worked
-by the same operator with the same tooling, so it adopts the family's
-satellite conventions rather than inventing a second set.
+This repository is part of the statifier package family (the fleet groups it
+with the family, and its reference, predicator-ex, is a family package), so it
+adopts the family's satellite conventions rather than inventing a second set.
 
 - **Domain-free examples.** The README, doc comments and test fixtures teach
   no example domain: examples use neutral names such as `x`, `score`, `items`
