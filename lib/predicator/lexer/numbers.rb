@@ -26,7 +26,7 @@ module Predicator
     # units, the dropped text included. Both are reproduced here, the corpus
     # fixing neither: `5d x`, a line feed and `y` scans as 5, `d` and `x` at
     # column 6, then the end of input; `5dh`, a line feed and `x` scans as
-    # 5, `d`, `h` and the end of input at column 8.
+    # 5, `d`, `h` and the end of input at column 6 of line 1.
     module Numbers
       # The units a duration names, the two-letter spellings first.
       UNIT = /m[so]|[ydhmsw]/
