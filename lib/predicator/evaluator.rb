@@ -8,6 +8,8 @@ require_relative "evaluator/chronology"
 require_relative "evaluator/arithmetic"
 require_relative "evaluator/access"
 require_relative "evaluator/rich_types"
+require_relative "evaluator/library"
+require_relative "evaluator/calls"
 
 module Predicator
   # The stack machine that runs an instruction list against a context, in
@@ -30,7 +32,9 @@ module Predicator
   # evaluation builds its own Machine. That includes the clock: an
   # instruction that reads the time reads the clock the caller passed, at
   # most once per evaluation, so every such instruction in one evaluation
-  # reads the same instant.
+  # reads the same instant. It includes the host's functions too: `call`
+  # reaches the ones the caller passed to this evaluation, then the
+  # package's own library, and nothing registered anywhere else.
   module Evaluator
     # The instruction-set version this build runs: an opcode retired at or
     # below it is refused.
@@ -94,6 +98,7 @@ module Predicator
       "relative_date" => Row.new(operands: [:string], removed_in: nil, handler: :relative_date),
       "object_new" => Row.new(operands: [], removed_in: nil, handler: :object_new),
       "object_set" => Row.new(operands: [:string], removed_in: nil, handler: :object_set),
+      "call" => Row.new(operands: %i[string count], removed_in: nil, handler: :call_function),
       "and" => Row.new(operands: [], removed_in: 3, handler: nil),
       "or" => Row.new(operands: [], removed_in: 3, handler: nil)
     }.freeze
@@ -107,17 +112,25 @@ module Predicator
     #   the current time as a {Predicator::DateTime}. It is called at most
     #   once, and only when an instruction reads the time. nil means
     #   {SYSTEM_CLOCK}.
+    # @param functions [Hash{String => #call}] the host's functions for this
+    #   evaluation, by the name a `call` instruction names. Each is called
+    #   with the call's arguments, first argument first, and answers the
+    #   call's value; the counts of arguments it accepts are the ones its
+    #   parameters take. A name here shadows the library function of the
+    #   same name, for this evaluation only. {Calls} says how a call is
+    #   refused.
     # @return [Result] the top of the stack at halt, or the error that
     #   stopped the run
     # @raise [ArgumentError] when an argument is not of its kind, or the
     #   clock answers something other than a {Predicator::DateTime} (a
     #   caller's bug, not an outcome of the program)
-    def self.evaluate(instructions, context = {}, on_unbound: :undefined, now: nil)
+    def self.evaluate(instructions, context = {}, on_unbound: :undefined, now: nil, functions: {})
       raise ArgumentError, "instructions must be an Array, not #{instructions.inspect}" unless instructions.is_a?(Array)
       raise ArgumentError, "context must be a Hash, not #{context.inspect}" unless context.is_a?(Hash)
 
       check_options(on_unbound, now)
-      Machine.new(instructions, context, on_unbound, now || SYSTEM_CLOCK).run
+      check_functions(functions)
+      Machine.new(instructions, context, on_unbound, now || SYSTEM_CLOCK, functions).run
     end
 
     def self.check_options(on_unbound, now)
@@ -128,24 +141,58 @@ module Predicator
     end
     private_class_method :check_options
 
+    def self.check_functions(functions)
+      raise ArgumentError, "functions must be a Hash, not #{functions.inspect}" unless functions.is_a?(Hash)
+
+      functions.each do |name, callable|
+        raise ArgumentError, "a function's name is a String, not #{name.inspect}" unless name.is_a?(String)
+        raise ArgumentError, "the function #{name} does not respond to call" unless callable.respond_to?(:call)
+      end
+    end
+    private_class_method :check_functions
+
+    # The error values the loop and every opcode's handler refuse with when
+    # the stack or the instruction itself is wrong. {Machine} includes it.
+    module Refusals
+      private
+
+      def insufficient(opcode)
+        EvaluationError.new(reason: "insufficient_operands",
+                            message: "#{opcode} needs more operands than the stack holds")
+      end
+
+      def unknown(at)
+        EvaluationError.new(reason: "unknown_instruction", message: "Unknown instruction at index #{at}")
+      end
+
+      def retired(opcode, version)
+        EvaluationError.new(reason: "retired_opcode",
+                            message: "#{opcode} was retired at instruction-set version #{version}")
+      end
+    end
+    private_constant :Refusals
+
     # One evaluation: the program, the context, the policy, the clock, the
-    # stack and the first root a load did not find bound. Each handler
-    # answers the index of the next instruction, or the error value that
-    # stops the run. The
-    # handlers of the arithmetic opcodes are in {Arithmetic}, those of
-    # access, membership and list construction in {Access}, and those of
-    # durations, relative dates and maps in {RichTypes}; Machine includes
-    # all three.
+    # host's functions, the stack and the first root a load did not find
+    # bound. Each handler answers the index of the next instruction, or the
+    # error value that stops the run. The handlers of the arithmetic opcodes are in {Arithmetic}, those of
+    # access, membership and list construction in {Access}, those of
+    # durations, relative dates and maps in {RichTypes}, and that of `call`
+    # in {Calls}, which includes the library {Library} defines; Machine
+    # includes all four, and the refusals they share in {Refusals}.
     class Machine
+      include Refusals
       include Arithmetic
       include Access
       include RichTypes
+      include Calls
 
-      def initialize(program, context, on_unbound, clock)
+      def initialize(program, context, on_unbound, clock, functions)
         @program = program
         @context = context
         @on_unbound = on_unbound
         @clock = clock
+        @functions = functions
         @stack = []
         @unbound = nil
       end
@@ -274,20 +321,6 @@ module Predicator
       end
 
       def unbound(name) = UndefinedVariableError.new(reason: "unbound_variable", message: "Undefined variable: #{name}")
-
-      def insufficient(opcode)
-        EvaluationError.new(reason: "insufficient_operands",
-                            message: "#{opcode} needs more operands than the stack holds")
-      end
-
-      def unknown(at)
-        EvaluationError.new(reason: "unknown_instruction", message: "Unknown instruction at index #{at}")
-      end
-
-      def retired(opcode, version)
-        EvaluationError.new(reason: "retired_opcode",
-                            message: "#{opcode} was retired at instruction-set version #{version}")
-      end
     end
   end
   private_constant :Evaluator

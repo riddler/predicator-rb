@@ -1,6 +1,6 @@
 {
 "claims": [
-{"surface":"evaluator","tier":4}
+{"surface":"evaluator","tier":5}
 ],
 "corpus_hash": "sha256:ddc5cf824b06b4899e1bd4166263a1ee07016ff239216e029b9276ac17243975",
 "entries": [
@@ -145,6 +145,35 @@
 {"case_id":"objects/literal-nested","surface":"evaluator","tier":4},
 {"case_id":"objects/literal-single-key","surface":"evaluator","tier":4},
 {"case_id":"objects/strict-equality-by-structure","surface":"evaluator","tier":4},
+{"case_id":"functions/concat-lists","surface":"evaluator","tier":5},
+{"case_id":"functions/date-day","surface":"evaluator","tier":5},
+{"case_id":"functions/date-month","surface":"evaluator","tier":5},
+{"case_id":"functions/date-year","surface":"evaluator","tier":5},
+{"case_id":"functions/ends-with","surface":"evaluator","tier":5},
+{"case_id":"functions/index-of-not-found","surface":"evaluator","tier":5},
+{"case_id":"functions/insufficient-arguments-on-stack","surface":"evaluator","tier":5},
+{"case_id":"functions/json-parse-array","surface":"evaluator","tier":5},
+{"case_id":"functions/json-parse-invalid-error","surface":"evaluator","tier":5},
+{"case_id":"functions/json-stringify-map-keys-sorted","surface":"evaluator","tier":5},
+{"case_id":"functions/len","surface":"evaluator","tier":5},
+{"case_id":"functions/lower","surface":"evaluator","tier":5},
+{"case_id":"functions/math-abs","surface":"evaluator","tier":5},
+{"case_id":"functions/math-ceil","surface":"evaluator","tier":5},
+{"case_id":"functions/math-floor","surface":"evaluator","tier":5},
+{"case_id":"functions/math-max","surface":"evaluator","tier":5},
+{"case_id":"functions/math-min","surface":"evaluator","tier":5},
+{"case_id":"functions/math-pow","surface":"evaluator","tier":5},
+{"case_id":"functions/math-pow-float-arg","surface":"evaluator","tier":5},
+{"case_id":"functions/math-pow-negative-exponent","surface":"evaluator","tier":5},
+{"case_id":"functions/math-round-half-away-from-zero","surface":"evaluator","tier":5},
+{"case_id":"functions/math-sqrt","surface":"evaluator","tier":5},
+{"case_id":"functions/math-sqrt-inexact","surface":"evaluator","tier":5},
+{"case_id":"functions/math-sqrt-negative-error","surface":"evaluator","tier":5},
+{"case_id":"functions/starts-with","surface":"evaluator","tier":5},
+{"case_id":"functions/substring-three-arg","surface":"evaluator","tier":5},
+{"case_id":"functions/trim","surface":"evaluator","tier":5},
+{"case_id":"functions/unknown-function","surface":"evaluator","tier":5},
+{"case_id":"functions/upper","surface":"evaluator","tier":5},
 {"case_id":"loops/jump-backward-past-start-is-unknown-instruction","surface":"evaluator","tier":9},
 {"case_id":"loops/jump-backward-zero-offset-is-unknown-instruction","surface":"evaluator","tier":9}
 ],
